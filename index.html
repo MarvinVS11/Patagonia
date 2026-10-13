@@ -71,6 +71,9 @@ body.editing .edit-btn .ic-done{display:block;}
 body.editing [contenteditable="true"]{outline:1px dashed rgba(44,125,160,0.55);outline-offset:2px;border-radius:3px;cursor:text;-webkit-user-select:text;user-select:text;min-width:1ch;}
 body.editing [contenteditable="true"]:focus{outline:2px solid #FBBF24;background:rgba(251,191,36,0.12);}
 body.editing .card-head [contenteditable="true"],body.editing .cal-strip [contenteditable="true"]{outline-color:rgba(255,255,255,0.45);}
+.seats-tbl .seat,.seats-tbl .seat-tbd{display:inline-block;min-width:3.2em;text-align:center;cursor:text;-webkit-user-select:text;user-select:text;border:1px dashed transparent;}
+.seats-tbl .seat-tbd{border-color:#D1D5DB;}
+.seats-tbl .seat:focus,.seats-tbl .seat-tbd:focus{outline:2px solid #FBBF24;outline-offset:1px;background:#FFFBEB;color:var(--deep);}
 .toast{position:fixed;left:50%;bottom:calc(var(--nav-h) + 1rem + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(10px);background:var(--deep);color:white;font-size:13px;font-weight:600;padding:0.5rem 0.9rem;border-radius:999px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:200;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
@@ -970,6 +973,32 @@ document.addEventListener('change', function (e) {
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 1400);
   }
 
+  // Asientos: siempre editables, sin entrar al modo edición
+  function isSeat(el) { return el.classList && (el.classList.contains('seat') || el.classList.contains('seat-tbd')); }
+  function enableSeats() {
+    scroll.querySelectorAll('.seat, .seat-tbd').forEach(function (el) {
+      el.setAttribute('contenteditable', 'true');
+      el.setAttribute('spellcheck', 'false');
+      el.setAttribute('autocapitalize', 'characters');
+      el.setAttribute('autocorrect', 'off');
+      el.setAttribute('enterkeyhint', 'done');
+    });
+  }
+  enableSeats();
+
+  scroll.addEventListener('focusin', function (e) {
+    var el = e.target;
+    if (!isSeat(el)) return;
+    if (/por asignar/i.test(el.textContent)) { el.textContent = ''; }
+    else {
+      var r = document.createRange(); r.selectNodeContents(el);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    }
+  });
+  scroll.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && isSeat(e.target)) { e.preventDefault(); e.target.blur(); }
+  });
+
   function setEditing(on) {
     editing = on;
     document.body.classList.toggle('editing', on);
@@ -977,6 +1006,7 @@ document.addEventListener('change', function (e) {
     lbl.textContent = on ? 'Listo' : 'Editar';
     bar.hidden = !on;
     fields().forEach(function (el) {
+      if (isSeat(el)) return;
       if (on) { el.setAttribute('contenteditable', 'true'); el.setAttribute('spellcheck', 'false'); }
       else { el.removeAttribute('contenteditable'); el.removeAttribute('spellcheck'); }
     });
@@ -992,10 +1022,11 @@ document.addEventListener('change', function (e) {
   // Asiento "Por asignar" pasa a estilo de asiento al escribir uno
   scroll.addEventListener('focusout', function (e) {
     var el = e.target;
-    if (el.classList && (el.classList.contains('seat-tbd') || el.classList.contains('seat'))) {
-      var t = el.textContent.trim(), tbd = !t || /por asignar/i.test(t);
+    if (isSeat(el)) {
+      var t = el.textContent.replace(/\s+/g, '').toUpperCase(), tbd = !t || /PORASIGNAR/.test(t);
       el.classList.toggle('seat-tbd', tbd); el.classList.toggle('seat', !tbd);
-      if (!t) el.textContent = 'Por asignar';
+      el.textContent = tbd ? 'Por asignar' : t;
+      save();
     }
   });
 
