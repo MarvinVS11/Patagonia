@@ -939,13 +939,17 @@ document.addEventListener('change', function (e) {
 
   // Restaurar cambios guardados
   var saved = store(function (ls) { return JSON.parse(ls.getItem(KEY) || 'null'); });
-  if (saved) sections.forEach(function (s) { if (saved[s.id]) s.innerHTML = saved[s.id]; });
+  // "vuelos" ya no se guarda local: su fuente es Supabase
+  var SYNCED = { vuelos: true };
+  if (saved) sections.forEach(function (s) { if (saved[s.id] && !SYNCED[s.id]) s.innerHTML = saved[s.id]; });
 
   // Elementos con texto propio = campos editables
   function fields() {
     var out = [];
     scroll.querySelectorAll('*').forEach(function (el) {
       if (/^(INPUT|SCRIPT|SVG|BR|UL|TABLE|TBODY|TR)$/i.test(el.tagName) || el.closest('svg')) return;
+      // En Vuelos solo se editan los campos ligados a Supabase
+      if (el.closest('#vuelos')) { if (el.hasAttribute('data-f')) out.push(el); return; }
       for (var n = el.firstChild; n; n = n.nextSibling) {
         if (n.nodeType === 3 && n.nodeValue.trim()) { out.push(el); return; }
       }
@@ -963,7 +967,7 @@ document.addEventListener('change', function (e) {
 
   function save() {
     var data = {};
-    sections.forEach(function (s) { data[s.id] = cleanHTML(s); });
+    sections.forEach(function (s) { if (!SYNCED[s.id]) data[s.id] = cleanHTML(s); });
     var ok = store(function (ls) { ls.setItem(KEY, JSON.stringify(data)); return true; });
     show(ok ? 'Guardado' : 'No se pudo guardar en este navegador');
   }
@@ -1013,9 +1017,18 @@ document.addEventListener('change', function (e) {
     if (!on) { document.activeElement && document.activeElement.blur(); save(); }
   }
 
+  // Para el módulo de Supabase
+  window.PatagoniaUI = {
+    show: show,
+    enableSeats: enableSeats,
+    isEditing: function () { return editing; },
+    refreshEditable: function () { if (editing) setEditing(true); }
+  };
+
   btn.addEventListener('click', function () { setEditing(!editing); });
 
-  scroll.addEventListener('input', function () {
+  scroll.addEventListener('input', function (e) {
+    if (e.target.closest && e.target.closest('#vuelos')) return; // lo guarda Supabase
     clearTimeout(saveTimer); saveTimer = setTimeout(save, 600);
   });
 
@@ -1026,7 +1039,6 @@ document.addEventListener('change', function (e) {
       var t = el.textContent.replace(/\s+/g, '').toUpperCase(), tbd = !t || /PORASIGNAR/.test(t);
       el.classList.toggle('seat-tbd', tbd); el.classList.toggle('seat', !tbd);
       el.textContent = tbd ? 'Por asignar' : t;
-      save();
     }
   });
 
@@ -1052,6 +1064,172 @@ document.addEventListener('change', function (e) {
     store(function (ls) { ls.removeItem(KEY); });
     location.reload();
   });
+})();
+</script>
+
+<!-- ── SUPABASE: vuelos y asientos compartidos por todo el grupo ── -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  var SUPABASE_URL = 'https://hjrjplzeycmponjopmrh.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_jCjWagjw7tZb-GcxsLZcgg_AbvGE6Sa'; // clave pública (segura en el navegador)
+  var CACHE_KEY = 'patagonia-vuelos-cache';
+
+  var UI = window.PatagoniaUI;
+  var root = document.getElementById('vuelos');
+  var state = { vuelos: [], asientos: [] };
+  var pendingRender = false;
+  var db = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+  // ── Formatos ──
+  var DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  var MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function fmtFecha(d) { var x = new Date(d + 'T12:00:00'); return DIAS[x.getDay()] + ' ' + x.getDate() + ' ' + MESES[x.getMonth()]; }
+  function fmtHora(t) { var p = t.split(':'), h = +p[0], m = p[1]; return (h % 12 || 12) + ':' + m + ' ' + (h < 12 ? 'AM' : 'PM'); }
+  function fmtDur(iv) {
+    if (!iv) return '';
+    var p = String(iv).match(/(\d+):(\d+)/); if (!p) return iv;
+    var h = +p[1], m = +p[2]; return h + 'h' + (m ? ' ' + m + 'm' : '');
+  }
+  function parseHora(t) {
+    var m = t.trim().match(/^(\d{1,2})[:.](\d{2})\s*([ap])?\.?\s*m?\.?$/i); if (!m) return null;
+    var h = +m[1], mi = +m[2]; if (mi > 59) return null;
+    if (m[3]) { if (h < 1 || h > 12) return null; h = (h % 12) + (/p/i.test(m[3]) ? 12 : 0); }
+    if (h > 23) return null;
+    return (h < 10 ? '0' : '') + h + ':' + m[2] + ':00';
+  }
+  function parseFecha(t) {
+    var iso = t.match(/(\d{4})-(\d{2})-(\d{2})/); if (iso) return iso[0];
+    var m = t.toLowerCase().match(/(\d{1,2})\s*(?:de\s*)?([a-zé]{3})/); if (!m) return null;
+    var mes = MESES.indexOf(m[2].replace('é', 'e')); if (mes < 0 || +m[1] < 1 || +m[1] > 31) return null;
+    return '2026-' + (mes < 9 ? '0' : '') + (mes + 1) + '-' + (+m[1] < 10 ? '0' : '') + (+m[1]);
+  }
+  function parseDur(t) {
+    var h = t.match(/(\d+)\s*h/i), m = t.match(/(\d+)\s*m/i);
+    if (!h && !m) return null;
+    var hh = h ? +h[1] : 0, mm = m ? +m[1] : 0; if (mm > 59) return null;
+    return (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm + ':00';
+  }
+
+  // ── Render ──
+  function F(field, value, cls) { return '<span' + (cls ? ' class="' + cls + '"' : '') + ' data-f="' + field + '">' + esc(value) + '</span>'; }
+
+  function flightHTML(v) {
+    var seats = state.asientos.filter(function (a) { return a.vuelo_id === v.id; })
+      .sort(function (a, b) { return a.orden - b.orden; })
+      .map(function (a) {
+        return '<tr><td>' + esc(a.pasajero) + '</td><td><span class="' + (a.asiento ? 'seat' : 'seat-tbd') + '" data-seat="' + a.id + '">' +
+          esc(a.asiento || 'Por asignar') + '</span></td></tr>';
+      }).join('');
+    return '<div class="flight" data-vuelo="' + v.id + '">' +
+      '<div class="flight-head">' + F('numero', v.numero, 'flight-num') +
+        '<span class="flight-route">' + esc(v.origen) + ' → ' + esc(v.destino) + '</span>' +
+        '<span class="flight-meta">' + F('aerolinea', v.aerolinea) + ' · ' + F('aeronave', v.aeronave || '') + '</span></div>' +
+      '<div class="flight-times">' +
+        '<div class="ft-dep">' + F('hora_salida', fmtHora(v.hora_salida), 'ft-time') +
+          '<span class="ft-place">' + F('origen_nombre', v.origen_nombre || '') + ' (' + F('origen', v.origen) + ')<br>' + F('fecha_salida', fmtFecha(v.fecha_salida)) + '</span></div>' +
+        '<div class="ft-mid">' + F('duracion', fmtDur(v.duracion)) + '</div>' +
+        '<div class="ft-arr">' + F('hora_llegada', fmtHora(v.hora_llegada), 'ft-time') +
+          '<span class="ft-place">' + F('destino_nombre', v.destino_nombre || '') + ' (' + F('destino', v.destino) + ')<br>' + F('fecha_llegada', fmtFecha(v.fecha_llegada)) + '</span></div>' +
+      '</div>' +
+      '<table class="seats-tbl"><tr><th>Pasajero</th><th>Asiento</th></tr>' + seats + '</table></div>';
+  }
+
+  function tramoHTML(tramo, tag, title) {
+    var vs = state.vuelos.filter(function (v) { return v.tramo === tramo; }).sort(function (a, b) { return a.orden - b.orden; });
+    if (!vs.length) return '';
+    var body = vs.map(function (v, i) {
+      var html = flightHTML(v);
+      if (i < vs.length - 1) html += '<span class="layover" data-vuelo="' + v.id + '">⏱ ' + F('escala_despues', v.escala_despues || 'Sin escala') + '</span>';
+      return html;
+    }).join('');
+    return '<div class="card"><div class="card-head"><span class="card-tag">' + tag + '</span><span class="card-title">' + title + '</span></div><div class="card-body">' + body + '</div></div>';
+  }
+
+  function render() {
+    if (root.contains(document.activeElement)) { pendingRender = true; return; } // no interrumpir a quien escribe
+    pendingRender = false;
+    root.innerHTML = tramoHTML('ida', 'IDA', 'San José → Puerto Natales') + tramoHTML('vuelta', 'VUELTA', 'Puerto Natales → San José');
+    UI.enableSeats();
+    UI.refreshEditable();
+  }
+
+  function cache() { try { localStorage.setItem(CACHE_KEY, JSON.stringify(state)); } catch (e) {} }
+  function loadCache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch (e) { return null; } }
+
+  // ── Carga inicial ──
+  function load() {
+    if (!db) { var c = loadCache(); if (c) { state = c; render(); } UI.show('Sin conexión · datos guardados'); return; }
+    Promise.all([
+      db.from('vuelos').select('*').order('id'),
+      db.from('asientos').select('*').order('id')
+    ]).then(function (r) {
+      if (r[0].error || r[1].error) throw r[0].error || r[1].error;
+      state = { vuelos: r[0].data, asientos: r[1].data };
+      cache(); render();
+    }).catch(function () {
+      var c = loadCache(); if (c) { state = c; render(); }
+      UI.show('Sin conexión · mostrando lo último guardado');
+    });
+  }
+
+  // ── Guardar ──
+  function upsertLocal(list, row) {
+    var i = state[list].findIndex(function (x) { return x.id === row.id; });
+    if (i >= 0) state[list][i] = Object.assign({}, state[list][i], row);
+  }
+
+  function saveRow(table, id, patch) {
+    if (!db) { UI.show('Sin conexión · no se guardó'); render(); return; }
+    db.from(table).update(patch).eq('id', id).select().single().then(function (r) {
+      if (r.error) throw r.error;
+      upsertLocal(table, r.data); cache(); render();
+      UI.show('Guardado para todos ✓');
+    }).catch(function () { UI.show('No se pudo guardar · revisa la conexión'); render(); });
+  }
+
+  root.addEventListener('focusout', function (e) {
+    var el = e.target;
+    // Asiento (corre después de la normalización a mayúsculas)
+    if (el.dataset && el.dataset.seat) {
+      var id = +el.dataset.seat, seat = state.asientos.find(function (a) { return a.id === id; });
+      var raw = el.textContent.replace(/\s+/g, '').toUpperCase();
+      var val = (!raw || /PORASIGNAR/.test(raw)) ? null : raw.slice(0, 6);
+      if (seat && seat.asiento !== val) saveRow('asientos', id, { asiento: val });
+      else if (pendingRender) render();
+      return;
+    }
+    // Campo del vuelo (modo Editar)
+    if (!el.dataset || !el.dataset.f) return;
+    var holder = el.closest('[data-vuelo]'); if (!holder) return;
+    var vid = +holder.dataset.vuelo, v = state.vuelos.find(function (x) { return x.id === vid; });
+    var f = el.dataset.f, t = el.textContent.trim(), value;
+    if (/^hora_/.test(f)) value = parseHora(t);
+    else if (/^fecha_/.test(f)) value = parseFecha(t);
+    else if (f === 'duracion') value = parseDur(t);
+    else if (f === 'origen' || f === 'destino') value = /^[a-z]{3}$/i.test(t) ? t.toUpperCase() : null;
+    else if (f === 'escala_despues') value = (t && !/^sin escala$/i.test(t)) ? t : null;
+    else if (f === 'aeronave' || /_nombre$/.test(f)) value = t || null;
+    else value = t || null;
+
+    var required = f !== 'escala_despues' && f !== 'aeronave' && !/_nombre$/.test(f);
+    if (value === null && required) { UI.show('Formato no válido · no se guardó'); setTimeout(render, 0); return; }
+    var current = v[f]; if (f === 'duracion') current = parseDur(fmtDur(current));
+    if (String(current) === String(value)) { setTimeout(render, 0); return; }
+    var patch = {}; patch[f] = value;
+    saveRow('vuelos', vid, patch);
+  });
+
+  // ── Tiempo real: cambios de otros teléfonos ──
+  if (db) {
+    db.channel('patagonia-vuelos')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'asientos' }, function (p) { upsertLocal('asientos', p.new); cache(); render(); })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vuelos' }, function (p) { upsertLocal('vuelos', p.new); cache(); render(); })
+      .subscribe();
+  }
+
+  load();
 })();
 </script>
 </body>
