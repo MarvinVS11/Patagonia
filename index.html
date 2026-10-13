@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Patagonia">
+<meta name="theme-color" content="#01304A">
+<title>Patagonia — Itinerario</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --deep:#01304A;--glacier:#2C7DA0;--ice:#E8F4F8;--snow:#F9FAFB;
+  --rock:#1F2937;--stone:#6B7280;--border:#E5E7EB;
+  --alert:#B45309;--alert-bg:#FEF3C7;
+  --success:#065F46;--success-bg:#D1FAE5;
+  --radius:12px;--nav-h:68px;
+}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;background:var(--deep);}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F3F4F6;color:var(--rock);font-size:16px;line-height:1.55;-webkit-tap-highlight-color:transparent;min-height:100vh;min-height:100dvh;overscroll-behavior-y:none;-webkit-font-smoothing:antialiased;}
+button,a{touch-action:manipulation;cursor:pointer;}
+button{-webkit-appearance:none;appearance:none;color:inherit;}
+.bnav-btn,.cal-day-btn,.docs-btn{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+.bnav-btn:focus-visible,.cal-day-btn:focus-visible,.docs-btn:focus-visible,.map-link:focus-visible{outline:2px solid var(--glacier);outline-offset:2px;}
+.bnav-btn:focus:not(:focus-visible),.cal-day-btn:focus:not(:focus-visible){outline:none;}
+
+/* ── HEADER ── */
+.header{
+  background:var(--deep);
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px);
+  position:-webkit-sticky;position:sticky;top:0;
+  z-index:50;
+}
+.header-inner{
+  display:flex;align-items:center;
+  padding:0.9rem 1rem;gap:0.75rem;
+}
+.header-titles{flex:1;text-align:center;}
+.header h1{
+  font-family:'Playfair Display',serif;
+  font-size:1.5rem;font-weight:700;color:white;line-height:1.1;
+}
+.header-sub{color:#93C5FD;font-size:12px;margin-top:1px;}
+.docs-btn{
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  background:rgba(255,255,255,0.1);
+  border:1px solid rgba(255,255,255,0.2);
+  border-radius:10px;padding:0.45rem 0.6rem;
+  color:#93C5FD;text-decoration:none;
+  font-size:10px;font-weight:600;min-width:52px;
+  flex-shrink:0;
+}
+.docs-btn svg{width:20px;height:20px;}
+.docs-btn:active{background:rgba(255,255,255,0.2);}
+
+/* ── CALENDAR ── */
+.cal-header{
+  background:var(--deep);color:white;
+  padding:0.875rem 1rem;border-radius:12px 12px 0 0;
+  text-align:center;
+}
+.cal-month{font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;}
+.cal-strip{
+  background:var(--deep);
+  display:flex;overflow-x:auto;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+  padding:0.5rem 0.75rem 0.75rem;
+  gap:0.5rem;border-radius:0 0 12px 12px;
+  margin-bottom:1rem;
+}
+.cal-strip::-webkit-scrollbar{display:none;}
+.cal-day-btn{
+  flex-shrink:0;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  background:rgba(255,255,255,0.1);
+  border:1px solid rgba(255,255,255,0.15);
+  border-radius:10px;
+  padding:0.5rem 0.6rem;
+  cursor:pointer;
+  font-family:'Inter',sans-serif;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:rgba(0,0,0,0);
+  min-width:50px;
+}
+
+.cal-day-btn:active{opacity:0.7;}
+.cal-day-num{font-size:18px;font-weight:700;color:white;line-height:1;}
+.cal-day-name{font-size:9px;color:rgba(255,255,255,0.6);font-weight:500;}
+.cal-day-btn span{pointer-events:none;}
+.cal-detail{display:none;}
+
+
+/* ── SCROLL AREA ── */
+/* El contenido usa el scroll nativo de la página (fiable en iOS Safari y Android Chrome) */
+.scroll-area{
+  max-width:640px;margin:0 auto;
+  padding:1rem calc(0.875rem + env(safe-area-inset-right,0px)) calc(var(--nav-h) + 1.25rem + env(safe-area-inset-bottom,0px)) calc(0.875rem + env(safe-area-inset-left,0px));
+}
+
+/* ── SECTION ── */
+.section{display:none;}
+
+
+/* ── CARD ── */
+.card{
+  background:white;border:1px solid var(--border);
+  border-radius:var(--radius);margin-bottom:1rem;
+  overflow:hidden;
+}
+.card-head{
+  background:var(--deep);color:white;
+  padding:0.875rem 1rem;
+  display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;
+}
+.card-tag{
+  background:rgba(255,255,255,0.15);
+  border-radius:6px;padding:0.2rem 0.6rem;
+  font-size:11px;font-weight:700;letter-spacing:0.04em;
+  flex-shrink:0;
+}
+.card-title{
+  font-family:'Playfair Display',serif;
+  font-size:1.05rem;font-weight:700;flex:1;
+}
+.card-date{font-size:12px;color:#93C5FD;white-space:nowrap;}
+.card-body{padding:1rem;}
+
+/* ── TIMELINE ── */
+.tl{list-style:none;}
+.tl-item{display:grid;grid-template-columns:58px 1fr;gap:0 0.875rem;margin-bottom:0.875rem;align-items:start;}
+.tl-time{font-size:12px;font-weight:700;color:var(--glacier);text-align:right;padding-top:2px;line-height:1.3;}
+.tl-text{font-size:15px;color:var(--rock);border-left:2px solid var(--border);padding-left:0.875rem;padding-bottom:0.5rem;}
+.tl-text b{font-weight:600;display:block;line-height:1.3;}
+.tl-text small{color:var(--stone);font-size:13px;margin-top:2px;display:block;}
+.map-link{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:13px;color:var(--glacier);text-decoration:none;
+  font-weight:500;margin-top:5px;
+  padding:4px 0;min-height:32px;
+}
+
+/* ── FLIGHT BLOCK ── */
+.flight{
+  background:var(--snow);border:1px solid var(--border);
+  border-radius:10px;padding:0.875rem;margin:0.5rem 0;
+}
+.flight-head{display:flex;align-items:center;gap:0.6rem;margin-bottom:0.75rem;flex-wrap:wrap;}
+.flight-num{background:var(--glacier);color:white;font-size:11px;font-weight:700;padding:0.25rem 0.55rem;border-radius:5px;}
+.flight-route{font-weight:700;font-size:15px;color:var(--deep);}
+.flight-meta{margin-left:auto;font-size:12px;color:var(--stone);}
+.flight-times{display:grid;grid-template-columns:1fr 44px 1fr;align-items:center;margin-bottom:0.75rem;gap:4px;}
+.ft-dep{text-align:left;}
+.ft-arr{text-align:right;}
+.ft-time{font-size:1.4rem;font-weight:700;color:var(--deep);display:block;line-height:1.1;}
+.ft-place{color:var(--stone);font-size:11px;line-height:1.3;margin-top:2px;}
+.ft-mid{text-align:center;font-size:11px;color:var(--stone);}
+.ft-mid::before{content:'✈';font-size:16px;display:block;color:var(--glacier);}
+.seats-tbl{width:100%;border-collapse:collapse;font-size:14px;margin-top:0.5rem;}
+.seats-tbl th{text-align:left;font-size:11px;font-weight:700;color:var(--stone);padding:0.35rem 0.5rem;border-bottom:1px solid var(--border);}
+.seats-tbl td{padding:0.5rem 0.5rem;border-bottom:1px solid #F3F4F6;}
+.seats-tbl tr:last-child td{border-bottom:none;}
+.seat{background:var(--ice);color:var(--glacier);font-weight:700;font-size:13px;padding:0.2rem 0.55rem;border-radius:5px;}
+.seat-tbd{background:#F3F4F6;color:var(--stone);font-size:12px;padding:0.2rem 0.55rem;border-radius:5px;}
+.layover{display:block;text-align:center;font-size:13px;color:var(--alert);background:var(--alert-bg);border-radius:6px;padding:0.4rem 0.75rem;margin:0.4rem 0;}
+
+/* ── PASSENGER CARD ── */
+.pax-grid{display:grid;grid-template-columns:1fr;gap:0.75rem;margin:0.5rem 0;}
+.pax-card{background:var(--snow);border:1px solid var(--border);border-radius:10px;padding:0.875rem;}
+.pax-name{font-weight:700;font-size:15px;color:var(--deep);margin-bottom:0.6rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border);}
+.pax-row{display:flex;justify-content:space-between;align-items:center;padding:0.35rem 0;border-bottom:1px solid #F9FAFB;}
+.pax-row:last-child{border-bottom:none;}
+.pax-label{color:var(--stone);font-size:13px;}
+.pax-val{font-family:ui-monospace,Menlo,"Roboto Mono",monospace;-webkit-user-select:text;user-select:text;font-size:13px;color:var(--rock);font-weight:600;}
+.pax-badge{background:var(--deep);color:white;padding:0.2rem 0.55rem;border-radius:5px;font-size:12px;font-family:ui-monospace,Menlo,"Roboto Mono",monospace;-webkit-user-select:text;user-select:text;letter-spacing:0.04em;}
+
+/* ── INFO / ALERT / OK BLOCKS ── */
+.info-block{background:var(--snow);border:1px solid var(--border);border-radius:10px;padding:0.875rem;margin:0.75rem 0;font-size:15px;}
+.info-block h4{font-weight:700;font-size:13px;color:var(--deep);margin-bottom:0.4rem;}
+.alert-block{background:var(--alert-bg);border-left:3px solid var(--alert);border-radius:0 10px 10px 0;padding:0.875rem 1rem;font-size:14px;color:#78350F;margin:0.75rem 0;}
+.alert-block b{font-weight:700;display:block;margin-bottom:0.2rem;font-size:15px;}
+.ok-block{background:var(--success-bg);border-left:3px solid var(--success);border-radius:0 10px 10px 0;padding:0.875rem 1rem;font-size:14px;color:#064E3B;margin:0.75rem 0;}
+.sec-title{font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--deep);margin-bottom:0.875rem;padding-bottom:0.5rem;border-bottom:2px solid var(--glacier);}
+
+/* ── TREK STATS ── */
+.trek-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:0.6rem;margin:0.75rem 0;}
+.stat{background:var(--snow);border:1px solid var(--border);border-radius:10px;padding:0.75rem 0.5rem;text-align:center;}
+.stat-val{font-size:1.3rem;font-weight:700;color:var(--glacier);display:block;}
+.stat-lbl{font-size:11px;color:var(--stone);line-height:1.3;}
+
+/* ── VEHICLE ── */
+.vehicle-row{display:flex;align-items:center;gap:0.875rem;background:var(--snow);border:1px solid var(--border);border-radius:10px;padding:0.875rem;margin:0.75rem 0;}
+.vehicle-icon{width:52px;height:52px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--ice);border-radius:10px;}
+.vehicle-icon svg{width:34px;height:34px;stroke:var(--glacier);}
+.vehicle-info h4{font-weight:700;font-size:15px;color:var(--deep);}
+.vehicle-info p{font-size:13px;color:var(--stone);}
+
+/* ── HORARIO TABLE ── */
+.horario{width:100%;border-collapse:collapse;font-size:14px;margin-top:0.5rem;}
+.horario td{padding:0.4rem 0.4rem;border-bottom:1px solid #F3F4F6;}
+.horario tr:last-child td{border-bottom:none;}
+.horario td:first-child{color:var(--stone);font-size:13px;width:38%;}
+.horario td:last-child{font-weight:600;color:var(--rock);}
+.camping-id{font-family:monospace;background:var(--ice);color:var(--glacier);padding:0.2rem 0.55rem;border-radius:5px;font-size:13px;}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  height:calc(var(--nav-h) + env(safe-area-inset-bottom,0px));
+  background:white;
+  border-top:1px solid var(--border);
+  display:flex;
+  padding:0 env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);
+  z-index:100;
+  -webkit-transform:translateZ(0);transform:translateZ(0);
+}
+.bnav-btn{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:3px;
+  background:none;border:none;cursor:pointer;
+  color:var(--stone);font-size:10px;font-weight:600;
+  font-family:'Inter',sans-serif;
+  padding:0.5rem 0.25rem;min-height:44px;
+}
+.bnav-btn svg{width:22px;height:22px;stroke:var(--stone);pointer-events:none;}
+
+.bnav-btn:active{opacity:0.6;}
+
+
+/* ── NAVEGACIÓN SIN JAVASCRIPT ──
+   Funciona aunque el iPhone abra el archivo en una vista previa que bloquea JS
+   (WhatsApp, Archivos, Drive, Correo). */
+.nav-radio{position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;margin:0;}
+label.bnav-btn,label.cal-day-btn{cursor:pointer;}
+#t-vuelos:checked ~ .scroll-area #vuelos,
+#t-pasajeros:checked ~ .scroll-area #pasajeros,
+#t-calendario:checked ~ .scroll-area #calendario,
+#t-hospedaje:checked ~ .scroll-area #hospedaje,
+#t-vehiculo:checked ~ .scroll-area #vehiculo{display:block;}
+#t-vuelos:checked ~ .bottom-nav label[for="t-vuelos"],
+#t-pasajeros:checked ~ .bottom-nav label[for="t-pasajeros"],
+#t-calendario:checked ~ .bottom-nav label[for="t-calendario"],
+#t-hospedaje:checked ~ .bottom-nav label[for="t-hospedaje"],
+#t-vehiculo:checked ~ .bottom-nav label[for="t-vehiculo"]{color:var(--glacier);}
+#t-vuelos:checked ~ .bottom-nav label[for="t-vuelos"] svg,
+#t-pasajeros:checked ~ .bottom-nav label[for="t-pasajeros"] svg,
+#t-calendario:checked ~ .bottom-nav label[for="t-calendario"] svg,
+#t-hospedaje:checked ~ .bottom-nav label[for="t-hospedaje"] svg,
+#t-vehiculo:checked ~ .bottom-nav label[for="t-vehiculo"] svg{stroke:var(--glacier);}
+#k1:checked ~ #c1,
+#k2:checked ~ #c2,
+#k3:checked ~ #c3,
+#k4:checked ~ #c4,
+#k5:checked ~ #c5,
+#k6:checked ~ #c6,
+#k7:checked ~ #c7,
+#k8:checked ~ #c8,
+#k9:checked ~ #c9,
+#k10:checked ~ #c10{display:block;}
+#k1:checked ~ .cal-strip label[for="k1"],
+#k2:checked ~ .cal-strip label[for="k2"],
+#k3:checked ~ .cal-strip label[for="k3"],
+#k4:checked ~ .cal-strip label[for="k4"],
+#k5:checked ~ .cal-strip label[for="k5"],
+#k6:checked ~ .cal-strip label[for="k6"],
+#k7:checked ~ .cal-strip label[for="k7"],
+#k8:checked ~ .cal-strip label[for="k8"],
+#k9:checked ~ .cal-strip label[for="k9"],
+#k10:checked ~ .cal-strip label[for="k10"]{background:var(--glacier);border-color:var(--glacier);}
+#k1:checked ~ .cal-strip label[for="k1"] .cal-day-name,
+#k2:checked ~ .cal-strip label[for="k2"] .cal-day-name,
+#k3:checked ~ .cal-strip label[for="k3"] .cal-day-name,
+#k4:checked ~ .cal-strip label[for="k4"] .cal-day-name,
+#k5:checked ~ .cal-strip label[for="k5"] .cal-day-name,
+#k6:checked ~ .cal-strip label[for="k6"] .cal-day-name,
+#k7:checked ~ .cal-strip label[for="k7"] .cal-day-name,
+#k8:checked ~ .cal-strip label[for="k8"] .cal-day-name,
+#k9:checked ~ .cal-strip label[for="k9"] .cal-day-name,
+#k10:checked ~ .cal-strip label[for="k10"] .cal-day-name{color:rgba(255,255,255,0.9);}
+</style>
+</head>
+<body>
+<input type="radio" name="tab" id="t-vuelos" class="nav-radio" checked aria-hidden="true" tabindex="-1">
+<input type="radio" name="tab" id="t-pasajeros" class="nav-radio" aria-hidden="true" tabindex="-1">
+<input type="radio" name="tab" id="t-calendario" class="nav-radio" aria-hidden="true" tabindex="-1">
+<input type="radio" name="tab" id="t-hospedaje" class="nav-radio" aria-hidden="true" tabindex="-1">
+<input type="radio" name="tab" id="t-vehiculo" class="nav-radio" aria-hidden="true" tabindex="-1">
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-inner">
+    <div style="width:52px"></div>
+    <div class="header-titles">
+      <h1>Patagonia</h1>
+      <div class="header-sub">Puerto Natales · Torres del Paine · Nov 2026</div>
+    </div>
+    <a class="docs-btn" href="https://drive.google.com/drive/folders/1bmT-jQK5jWWCNj5L5GP3GJCUXSrPJd4Z" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      Docs
+    </a>
+  </div>
+</div>
+
+<!-- SCROLL AREA -->
+<div class="scroll-area" id="scroll">
+
+<!-- ═══════════════ CALENDARIO ═══════════════ -->
+<div id="calendario" class="section">
+  <input type="radio" name="cal" id="k1" class="nav-radio" checked aria-hidden="true" tabindex="-1">
+  <input type="radio" name="cal" id="k2" class="nav-radio" aria-hidden="true" tabindex="-1">
+  <input type="radio" name="cal" id="k3" class="nav-radio" aria-hidden="true" tabindex="-1">
+  <input type="radio" name="cal" id="k4" class="nav-radio" aria-hidden="true" tabindex="-1">
+  <input type="radio" name="cal" id="k5" class="nav-radio" aria-hidden="true" tabindex="-1">
+  <input type="radio" name="cal" id="k6" class="nav-radio" aria-hidden="true" tabindex="-1">
+  <input type="radio" name="cal" id="k7" class="nav-radio" aria-hidden="true" tabindex="-1">
+  <input type="radio" name="cal" id="k8" class="nav-radio" aria-hidden="true" tabindex="-1">
+  <input type="radio" name="cal" id="k9" class="nav-radio" aria-hidden="true" tabindex="-1">
+  <input type="radio" name="cal" id="k10" class="nav-radio" aria-hidden="true" tabindex="-1">
+  <div class="cal-header"><div class="cal-month">Noviembre 2026</div></div>
+  <div class="cal-strip" id="cal-strip">
+    <label class="cal-day-btn" for="k1"><span class="cal-day-num">6</span><span class="cal-day-name">Vie</span></label>
+    <label class="cal-day-btn" for="k2"><span class="cal-day-num">7</span><span class="cal-day-name">Sáb</span></label>
+    <label class="cal-day-btn" for="k3"><span class="cal-day-num">8</span><span class="cal-day-name">Dom</span></label>
+    <label class="cal-day-btn" for="k4"><span class="cal-day-num">9</span><span class="cal-day-name">Lun</span></label>
+    <label class="cal-day-btn" for="k5"><span class="cal-day-num">10</span><span class="cal-day-name">Mar</span></label>
+    <label class="cal-day-btn" for="k6"><span class="cal-day-num">11</span><span class="cal-day-name">Mié</span></label>
+    <label class="cal-day-btn" for="k7"><span class="cal-day-num">12</span><span class="cal-day-name">Jue</span></label>
+    <label class="cal-day-btn" for="k8"><span class="cal-day-num">13</span><span class="cal-day-name">Vie</span></label>
+    <label class="cal-day-btn" for="k9"><span class="cal-day-num">14</span><span class="cal-day-name">Sáb</span></label>
+    <label class="cal-day-btn" for="k10"><span class="cal-day-num">15</span><span class="cal-day-name">Dom</span></label>
+  </div>
+
+  <!-- Day details shown inline -->
+  <div class="cal-detail" id="c1">
+    <div class="card"><div class="card-head"><span class="card-tag">Día 1</span><span class="card-title">San José → Santiago</span><span class="card-date">Vie 6 nov</span></div><div class="card-body"><ul class="tl"><li class="tl-item"><span class="tl-time">3:00 PM</span><div class="tl-text"><b>Aeropuerto Juan Santamaría (SJO)</b><small>Check-in · documentos · migración</small></div></li><li class="tl-item"><span class="tl-time">6:05 PM</span><div class="tl-text"><b>Vuelo CM 839 — Sale SJO</b><small>Panamá (PTY) · 1h 25m</small></div></li><li class="tl-item"><span class="tl-time">8:30 PM</span><div class="tl-text"><b>Llegada PTY — Escala 54 min</b></div></li><li class="tl-item"><span class="tl-time">9:24 PM</span><div class="tl-text"><b>Vuelo CM 277 — Sale PTY</b><small>Santiago (SCL) · 7h 22m · nocturno</small></div></li></ul></div></div>
+  </div>
+
+  <div class="cal-detail" id="c2">
+    <div class="card"><div class="card-head"><span class="card-tag">Día 2</span><span class="card-title">Santiago → Puerto Natales</span><span class="card-date">Sáb 7 nov</span></div><div class="card-body"><ul class="tl"><li class="tl-item"><span class="tl-time">5:46 AM</span><div class="tl-text"><b>Llegada SCL</b><small>4 horas de espera en aeropuerto</small></div></li><li class="tl-item"><span class="tl-time">6:59 AM</span><div class="tl-text"><b>Check-in Sky Airline</b><small>3 horas antes del vuelo</small></div></li><li class="tl-item"><span class="tl-time">9:59 AM</span><div class="tl-text"><b>Vuelo H2 2613 — Sale SCL</b><small>Puerto Natales (PNT) · ~4h 38m</small></div></li><li class="tl-item"><span class="tl-time">2:37 PM</span><div class="tl-text"><b>Llegada PNT</b></div></li><li class="tl-item"><span class="tl-time">3:45 PM</span><div class="tl-text"><b>Entrega vehículo — Natales Rentals</b><small>Jetour X70</small></div></li><li class="tl-item"><span class="tl-time">~4:00 PM</span><div class="tl-text"><b>Traslado a Cabaña Aquiles</b></div></li><li class="tl-item"><span class="tl-time">Noche</span><div class="tl-text"><b>Baño · descanso · cenar en el pueblo</b></div></li></ul></div></div>
+  </div>
+
+  <div class="cal-detail" id="c3">
+    <div class="card"><div class="card-head"><span class="card-tag">Día 3</span><span class="card-title">Puerto Natales — libre</span><span class="card-date">Dom 8 nov</span></div><div class="card-body"><ul class="tl"><li class="tl-item"><span class="tl-time">Mañana</span><div class="tl-text"><b>Desayuno y recorrido por el pueblo</b></div></li><li class="tl-item"><span class="tl-time">Tarde</span><div class="tl-text"><b>Tour en vehículo por los alrededores</b><small>Por definir</small></div></li><li class="tl-item"><span class="tl-time">Tarde</span><div class="tl-text"><b>Supermercado + farmacia</b><small>Compras para trekking</small></div></li></ul></div></div>
+  </div>
+
+  <div class="cal-detail" id="c4">
+    <div class="card"><div class="card-head"><span class="card-tag">Día 4</span><span class="card-title">Base Torres — trekking</span><span class="card-date">Lun 9 nov</span></div><div class="card-body"><div class="trek-stats"><div class="stat"><span class="stat-val">22 km</span><span class="stat-lbl">ida y vuelta</span></div><div class="stat"><span class="stat-val">~11.5h</span><span class="stat-lbl">duración</span></div><div class="stat"><span class="stat-val">845 m</span><span class="stat-lbl">desnivel</span></div></div><div class="alert-block"><b>Salida 4:50 AM</b>Preparar mochilas la noche anterior.</div><ul class="tl"><li class="tl-item"><span class="tl-time">4:50 AM</span><div class="tl-text"><b>Salida desde P. Natales en Jetour X70</b><small>~2 horas de ruta</small></div></li><li class="tl-item"><span class="tl-time">7:00 AM</span><div class="tl-text"><b>Inicio trekking Base Torres</b></div></li><li class="tl-item"><span class="tl-time">~1:00 PM</span><div class="tl-text"><b>Mirador Base Torres</b><small>Almuerzo y descanso</small></div></li><li class="tl-item"><span class="tl-time">6:30 PM</span><div class="tl-text"><b>Regreso al estacionamiento</b></div></li><li class="tl-item"><span class="tl-time">9:00 PM</span><div class="tl-text"><b>Devolución vehículo — Blanco Encalada 574</b></div></li></ul></div></div>
+  </div>
+
+  <div class="cal-detail" id="c5">
+    <div class="card"><div class="card-head"><span class="card-tag">Día 5</span><span class="card-title">Camping Grey — catamarán</span><span class="card-date">Mar 10 nov</span></div><div class="card-body"><div class="alert-block"><b>Bus Sale 7:00 AM</b>Terminal Bus Sur — Av. Baquedano 534</div><ul class="tl"><li class="tl-item"><span class="tl-time">6:30 AM</span><div class="tl-text"><b>Desayuno en Cabaña Aquiles</b></div></li><li class="tl-item"><span class="tl-time">7:00 AM</span><div class="tl-text"><b>Bus Sur → Hotel Grey</b></div></li><li class="tl-item"><span class="tl-time">11:30 AM</span><div class="tl-text"><b>Llegada Hotel Grey</b></div></li><li class="tl-item"><span class="tl-time">3:00 PM</span><div class="tl-text"><b>Check-in Catamarán Grey III</b></div></li><li class="tl-item"><span class="tl-time">4:00 PM</span><div class="tl-text"><b>Zarpe — vista al Glaciar Grey</b></div></li><li class="tl-item"><span class="tl-time">5:30 PM</span><div class="tl-text"><b>Llegada Camping Grey</b><small>Cena incluida · 6:30–9 PM</small></div></li></ul></div></div>
+  </div>
+
+  <div class="cal-detail" id="c6">
+    <div class="card"><div class="card-head"><span class="card-tag">Día 6</span><span class="card-title">Glaciar Grey + Paine Grande</span><span class="card-date">Mié 11 nov</span></div><div class="card-body"><ul class="tl"><li class="tl-item"><span class="tl-time">6:30 AM</span><div class="tl-text"><b>Desayuno en Camping Grey</b></div></li><li class="tl-item"><span class="tl-time">8:30 AM</span><div class="tl-text"><b>Ice Hike — Glaciar Grey</b><small>5 horas · 2.5h sobre el hielo</small></div></li><li class="tl-item"><span class="tl-time">1:30 PM</span><div class="tl-text"><b>Fin actividad</b></div></li><li class="tl-item"><span class="tl-time">~2:30 PM</span><div class="tl-text"><b>Caminata Grey → Paine Grande</b><small>11 km · ~4 horas</small></div></li><li class="tl-item"><span class="tl-time">~6:30 PM</span><div class="tl-text"><b>Llegada Camping Paine Grande</b><small>Cena incluida · 6:30–9 PM</small></div></li></ul></div></div>
+  </div>
+
+  <div class="cal-detail" id="c7">
+    <div class="card"><div class="card-head"><span class="card-tag">Día 7</span><span class="card-title">Miradores + regreso</span><span class="card-date">Jue 12 nov</span></div><div class="card-body"><ul class="tl"><li class="tl-item"><span class="tl-time">6:30 AM</span><div class="tl-text"><b>Desayuno en Camping Paine Grande</b></div></li><li class="tl-item"><span class="tl-time">11:20 AM</span><div class="tl-text"><b>Zarpe Catamarán Lago Pehoé</b><small>Hielos Patagónicos · Paine Grande → Pudeto</small></div></li><li class="tl-item"><span class="tl-time">12:00 PM</span><div class="tl-text"><b>Miradores</b><small>Pehoé → Salto Grande → Cuernos · 9 km · 2h 45m</small></div></li><li class="tl-item"><span class="tl-time">3:30 PM</span><div class="tl-text"><b>Café en Hostería Pehoé</b></div></li><li class="tl-item"><span class="tl-time">6:00 PM</span><div class="tl-text"><b>Bus Sur → Puerto Natales</b></div></li><li class="tl-item"><span class="tl-time">~8:00 PM</span><div class="tl-text"><b>Llegada · cena en el pueblo</b></div></li></ul></div></div>
+  </div>
+
+  <div class="cal-detail" id="c8">
+    <div class="card"><div class="card-head"><span class="card-tag">Día 8</span><span class="card-title">Puerto Natales — libre</span><span class="card-date">Vie 13 nov</span></div><div class="card-body"><ul class="tl"><li class="tl-item"><span class="tl-time">Mañana</span><div class="tl-text"><b>Levantarse tarde · descanso</b></div></li><li class="tl-item"><span class="tl-time">Tarde</span><div class="tl-text"><b>Recorrer Puerto Natales</b><small>Plaza de Armas · Costanera · tiendas</small></div></li><li class="tl-item"><span class="tl-time">Noche</span><div class="tl-text"><b>Salir de fiesta en Puerto Natales</b></div></li></ul></div></div>
+  </div>
+
+  <div class="cal-detail" id="c9">
+    <div class="card"><div class="card-head"><span class="card-tag">Día 9</span><span class="card-title">Vuelo a Santiago</span><span class="card-date">Sáb 14 nov</span></div><div class="card-body"><ul class="tl"><li class="tl-item"><span class="tl-time">Mañana</span><div class="tl-text"><b>Desayuno en Cabaña Aquiles</b></div></li><li class="tl-item"><span class="tl-time">Mediodía</span><div class="tl-text"><b>Almuerzo en el pueblo</b></div></li><li class="tl-item"><span class="tl-time">~12:30 PM</span><div class="tl-text"><b>Checkout Cabaña Aquiles</b></div></li><li class="tl-item"><span class="tl-time">1:00 PM</span><div class="tl-text"><b>Uber al aeropuerto PNT</b><small>~10-15 minutos</small></div></li><li class="tl-item"><span class="tl-time">3:32 PM</span><div class="tl-text"><b>Vuelo H2 2614 — Sale PNT</b><small>Santiago (SCL) · ~4h 42m</small></div></li><li class="tl-item"><span class="tl-time">8:14 PM</span><div class="tl-text"><b>Llegada SCL · espera en aeropuerto</b></div></li></ul></div></div>
+  </div>
+
+  <div class="cal-detail" id="c10">
+    <div class="card"><div class="card-head"><span class="card-tag">Día 10</span><span class="card-title">Regreso a San José</span><span class="card-date">Dom 15 nov</span></div><div class="card-body"><ul class="tl"><li class="tl-item"><span class="tl-time">1:02 AM</span><div class="tl-text"><b>Vuelo CM 276 — Sale SCL</b><small>Panamá (PTY) · 5h 57m</small></div></li><li class="tl-item"><span class="tl-time">5:59 AM</span><div class="tl-text"><b>Llegada PTY — Escala 41 min</b></div></li><li class="tl-item"><span class="tl-time">6:40 AM</span><div class="tl-text"><b>Vuelo CM 787 — Sale PTY</b><small>San José (SJO) · 1h 22m</small></div></li><li class="tl-item"><span class="tl-time">7:02 AM</span><div class="tl-text"><b>Llegada SJO 🏔️</b></div></li></ul><div class="ok-block">Viaje completado · 10 días · Patagonia 2026</div></div></div>
+  </div>
+
+</div>
+
+<!-- ═══════════════ VUELOS ═══════════════ -->
+<div id="vuelos" class="section">
+
+  <div class="card">
+    <div class="card-head"><span class="card-tag">IDA</span><span class="card-title">San José → Puerto Natales</span></div>
+    <div class="card-body">
+
+      <div class="flight">
+        <div class="flight-head"><span class="flight-num">CM 839</span><span class="flight-route">SJO → PTY</span><span class="flight-meta">Copa · 7M9</span></div>
+        <div class="flight-times">
+          <div class="ft-dep"><span class="ft-time">6:05 PM</span><span class="ft-place">San José (SJO)<br>Vie 6 nov</span></div>
+          <div class="ft-mid">1h 25m</div>
+          <div class="ft-arr"><span class="ft-time">8:30 PM</span><span class="ft-place">Panamá (PTY)<br>Vie 6 nov</span></div>
+        </div>
+        <table class="seats-tbl">
+          <tr><th>Pasajero</th><th>Asiento</th></tr>
+          <tr><td>Nallely González</td><td><span class="seat">32A</span></td></tr>
+          <tr><td>Adrian Rodríguez</td><td><span class="seat">32B</span></td></tr>
+          <tr><td>Heylin Solano</td><td><span class="seat">33A</span></td></tr>
+          <tr><td>Emanuel Zamora</td><td><span class="seat">33B</span></td></tr>
+          <tr><td>Karol Zamora</td><td><span class="seat">33C</span></td></tr>
+          <tr><td>Marvin Villalobos</td><td><span class="seat-tbd">Por asignar</span></td></tr>
+        </table>
+      </div>
+
+      <span class="layover">⏱ Escala en Panamá: 54 minutos</span>
+
+      <div class="flight">
+        <div class="flight-head"><span class="flight-num">CM 277</span><span class="flight-route">PTY → SCL</span><span class="flight-meta">Copa · 7M9</span></div>
+        <div class="flight-times">
+          <div class="ft-dep"><span class="ft-time">9:24 PM</span><span class="ft-place">Panamá (PTY)<br>Vie 6 nov</span></div>
+          <div class="ft-mid">7h 22m</div>
+          <div class="ft-arr"><span class="ft-time">5:46 AM</span><span class="ft-place">Santiago (SCL)<br>Sáb 7 nov</span></div>
+        </div>
+        <table class="seats-tbl">
+          <tr><th>Pasajero</th><th>Asiento</th></tr>
+          <tr><td>Nallely González</td><td><span class="seat">32A</span></td></tr>
+          <tr><td>Adrian Rodríguez</td><td><span class="seat">32B</span></td></tr>
+          <tr><td>Heylin Solano</td><td><span class="seat">33A</span></td></tr>
+          <tr><td>Emanuel Zamora</td><td><span class="seat">33B</span></td></tr>
+          <tr><td>Karol Zamora</td><td><span class="seat">33C</span></td></tr>
+          <tr><td>Marvin Villalobos</td><td><span class="seat-tbd">Por asignar</span></td></tr>
+        </table>
+      </div>
+
+      <span class="layover">⏱ Espera en Santiago: 4 horas (aeropuerto)</span>
+
+      <div class="flight">
+        <div class="flight-head"><span class="flight-num">H2 2613</span><span class="flight-route">SCL → PNT</span><span class="flight-meta">Sky · A320</span></div>
+        <div class="flight-times">
+          <div class="ft-dep"><span class="ft-time">9:59 AM</span><span class="ft-place">Santiago (SCL)<br>Sáb 7 nov</span></div>
+          <div class="ft-mid">4h 38m</div>
+          <div class="ft-arr"><span class="ft-time">2:37 PM</span><span class="ft-place">Pto. Natales (PNT)<br>Sáb 7 nov</span></div>
+        </div>
+        <table class="seats-tbl">
+          <tr><th>Pasajero</th><th>Asiento</th></tr>
+          <tr><td>Nallely González</td><td><span class="seat">23A</span></td></tr>
+          <tr><td>Emanuel Zamora</td><td><span class="seat">24A</span></td></tr>
+          <tr><td>Heylin Solano</td><td><span class="seat">24B</span></td></tr>
+          <tr><td>Adrian Rodríguez</td><td><span class="seat">25A</span></td></tr>
+          <tr><td>Karol Zamora</td><td><span class="seat">25B</span></td></tr>
+          <tr><td>Marvin Villalobos</td><td><span class="seat-tbd">Por asignar</span></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-tag">VUELTA</span><span class="card-title">Puerto Natales → San José</span></div>
+    <div class="card-body">
+
+      <div class="flight">
+        <div class="flight-head"><span class="flight-num">H2 2614</span><span class="flight-route">PNT → SCL</span><span class="flight-meta">Sky · A320</span></div>
+        <div class="flight-times">
+          <div class="ft-dep"><span class="ft-time">3:32 PM</span><span class="ft-place">Pto. Natales (PNT)<br>Sáb 14 nov</span></div>
+          <div class="ft-mid">4h 42m</div>
+          <div class="ft-arr"><span class="ft-time">8:14 PM</span><span class="ft-place">Santiago (SCL)<br>Sáb 14 nov</span></div>
+        </div>
+        <table class="seats-tbl">
+          <tr><th>Pasajero</th><th>Asiento</th></tr>
+          <tr><td>Nallely González</td><td><span class="seat">23F</span></td></tr>
+          <tr><td>Emanuel Zamora</td><td><span class="seat">24F</span></td></tr>
+          <tr><td>Heylin Solano</td><td><span class="seat">24E</span></td></tr>
+          <tr><td>Adrian Rodríguez</td><td><span class="seat">25F</span></td></tr>
+          <tr><td>Karol Zamora</td><td><span class="seat">25E</span></td></tr>
+          <tr><td>Marvin Villalobos</td><td><span class="seat-tbd">Por asignar</span></td></tr>
+        </table>
+      </div>
+
+      <span class="layover">⏱ Espera en Santiago: ~4h 48min (aeropuerto)</span>
+
+      <div class="flight">
+        <div class="flight-head"><span class="flight-num">CM 276</span><span class="flight-route">SCL → PTY</span><span class="flight-meta">Copa · 7M8</span></div>
+        <div class="flight-times">
+          <div class="ft-dep"><span class="ft-time">1:02 AM</span><span class="ft-place">Santiago (SCL)<br>Dom 15 nov</span></div>
+          <div class="ft-mid">5h 57m</div>
+          <div class="ft-arr"><span class="ft-time">5:59 AM</span><span class="ft-place">Panamá (PTY)<br>Dom 15 nov</span></div>
+        </div>
+        <table class="seats-tbl">
+          <tr><th>Pasajero</th><th>Asiento</th></tr>
+          <tr><td>Nallely González</td><td><span class="seat">32E</span></td></tr>
+          <tr><td>Adrian Rodríguez</td><td><span class="seat">32F</span></td></tr>
+          <tr><td>Heylin Solano</td><td><span class="seat">33E</span></td></tr>
+          <tr><td>Emanuel Zamora</td><td><span class="seat">33D</span></td></tr>
+          <tr><td>Karol Zamora</td><td><span class="seat">33F</span></td></tr>
+          <tr><td>Marvin Villalobos</td><td><span class="seat-tbd">Por asignar</span></td></tr>
+        </table>
+      </div>
+
+      <span class="layover">⏱ Escala en Panamá: 41 minutos</span>
+
+      <div class="flight">
+        <div class="flight-head"><span class="flight-num">CM 787</span><span class="flight-route">PTY → SJO</span><span class="flight-meta">Copa · 7M8</span></div>
+        <div class="flight-times">
+          <div class="ft-dep"><span class="ft-time">6:40 AM</span><span class="ft-place">Panamá (PTY)<br>Dom 15 nov</span></div>
+          <div class="ft-mid">1h 22m</div>
+          <div class="ft-arr"><span class="ft-time">7:02 AM</span><span class="ft-place">San José (SJO)<br>Dom 15 nov</span></div>
+        </div>
+        <table class="seats-tbl">
+          <tr><th>Pasajero</th><th>Asiento</th></tr>
+          <tr><td>Nallely González</td><td><span class="seat">32E</span></td></tr>
+          <tr><td>Adrian Rodríguez</td><td><span class="seat">32F</span></td></tr>
+          <tr><td>Heylin Solano</td><td><span class="seat">33E</span></td></tr>
+          <tr><td>Emanuel Zamora</td><td><span class="seat">33D</span></td></tr>
+          <tr><td>Karol Zamora</td><td><span class="seat">33F</span></td></tr>
+          <tr><td>Marvin Villalobos</td><td><span class="seat-tbd">Por asignar</span></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ PASAJEROS ═══════════════ -->
+<div id="pasajeros" class="section">
+  <div class="pax-grid">
+
+    <div class="pax-card">
+      <div class="pax-name">Adrian Rodríguez Murillo</div>
+      <div class="pax-row"><span class="pax-label">Pasaporte</span><span class="pax-val">B00579394</span></div>
+      <div class="pax-row"><span class="pax-label">Licencia</span><span class="pax-val">CI-207970960</span></div>
+      <div class="pax-row"><span class="pax-label">Boleto Copa</span><span class="pax-badge">2302156988065</span></div>
+      <div class="pax-row"><span class="pax-label">Orden Copa</span><span class="pax-badge">BOEJBI</span></div>
+      <div class="pax-row"><span class="pax-label">Boleto Sky</span><span class="pax-badge">6052110252518</span></div>
+      <div class="pax-row"><span class="pax-label">Reserva Sky</span><span class="pax-badge">OELZUL</span></div>
+    </div>
+
+    <div class="pax-card">
+      <div class="pax-name">Nallely González Zamora</div>
+      <div class="pax-row"><span class="pax-label">Pasaporte</span><span class="pax-val">B01644634</span></div>
+      <div class="pax-row"><span class="pax-label">Licencia</span><span class="pax-val" style="color:var(--stone)">No aplica</span></div>
+      <div class="pax-row"><span class="pax-label">Boleto Copa</span><span class="pax-badge">2302156988064</span></div>
+      <div class="pax-row"><span class="pax-label">Orden Copa</span><span class="pax-badge">BOEJBI</span></div>
+      <div class="pax-row"><span class="pax-label">Boleto Sky</span><span class="pax-badge">6052110252517</span></div>
+      <div class="pax-row"><span class="pax-label">Reserva Sky</span><span class="pax-badge">OELZUL</span></div>
+    </div>
+
+    <div class="pax-card">
+      <div class="pax-name">Karol Zamora Villalobos</div>
+      <div class="pax-row"><span class="pax-label">Pasaporte</span><span class="pax-val">B00703889</span></div>
+      <div class="pax-row"><span class="pax-label">Licencia</span><span class="pax-val">CI-207400890</span></div>
+      <div class="pax-row"><span class="pax-label">Boleto Sky</span><span class="pax-badge">6052110252519</span></div>
+      <div class="pax-row"><span class="pax-label">Reserva Sky</span><span class="pax-badge">OELZUL</span></div>
+    </div>
+
+    <div class="pax-card">
+      <div class="pax-name">Heylin Solano Jiménez</div>
+      <div class="pax-row"><span class="pax-label">Pasaporte</span><span class="pax-val">B01618676</span></div>
+      <div class="pax-row"><span class="pax-label">Licencia</span><span class="pax-val" style="color:var(--stone)">No aplica</span></div>
+      <div class="pax-row"><span class="pax-label">Boleto Copa</span><span class="pax-badge">2302156988304</span></div>
+      <div class="pax-row"><span class="pax-label">Orden Copa</span><span class="pax-badge">BOIWWR</span></div>
+      <div class="pax-row"><span class="pax-label">Boleto Sky</span><span class="pax-badge">6052110252814</span></div>
+      <div class="pax-row"><span class="pax-label">Reserva Sky</span><span class="pax-badge">JUTXEM</span></div>
+    </div>
+
+    <div class="pax-card">
+      <div class="pax-name">Emanuel Zamora Villalobos</div>
+      <div class="pax-row"><span class="pax-label">Pasaporte</span><span class="pax-val">B01391569</span></div>
+      <div class="pax-row"><span class="pax-label">Licencia</span><span class="pax-val">CI-208230660</span></div>
+      <div class="pax-row"><span class="pax-label">Boleto Sky</span><span class="pax-badge">6052110251964</span></div>
+      <div class="pax-row"><span class="pax-label">Reserva Sky</span><span class="pax-badge">ORXOWA</span></div>
+    </div>
+
+    <div class="pax-card">
+      <div class="pax-name">Marvin Villalobos Sánchez</div>
+      <div class="pax-row"><span class="pax-label">Pasaporte</span><span class="pax-val">B00197791</span></div>
+      <div class="pax-row"><span class="pax-label">Licencia</span><span class="pax-val">CI-206910982</span></div>
+      <div class="pax-row"><span class="pax-label">Copa/Sky</span><span class="pax-val" style="color:var(--stone)">Por confirmar</span></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════ DÍA 1 ═══════════════ -->
+<div id="d1" class="section">
+  <div class="card">
+    <div class="card-head"><span class="card-tag">Día 1</span><span class="card-title">San José → Santiago</span><span class="card-date">Vie 6 nov</span></div>
+    <div class="card-body">
+      <div class="alert-block"><b>Presentarse en SJO a las 3:00 PM</b>Check-in Copa Airlines · vuelo internacional · 3 horas antes.</div>
+      <ul class="tl">
+        <li class="tl-item"><span class="tl-time">3:00 PM</span><div class="tl-text"><b>Aeropuerto Juan Santamaría (SJO)</b><small>Check-in, documentos, migración</small><a class="map-link" href="https://maps.google.com/?q=Aeropuerto+Internacional+Juan+Santamaria+Costa+Rica" target="_blank" rel="noopener">📍 Google Maps</a></div></li>
+        <li class="tl-item"><span class="tl-time">6:05 PM</span><div class="tl-text"><b>Vuelo CM 839 — Sale SJO</b><small>Ciudad de Panamá (PTY) · 1h 25m · Boeing 737 MAX 9</small></div></li>
+        <li class="tl-item"><span class="tl-time">8:30 PM</span><div class="tl-text"><b>Llegada PTY — Tocumen</b><small>Escala: 54 minutos</small></div></li>
+        <li class="tl-item"><span class="tl-time">9:24 PM</span><div class="tl-text"><b>Vuelo CM 277 — Sale PTY</b><small>Santiago (SCL) · 7h 22m · Vuelo nocturno · Boeing 737 MAX 9</small></div></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ DÍA 2 ═══════════════ -->
+<div id="d2" class="section">
+  <div class="card">
+    <div class="card-head"><span class="card-tag">Día 2</span><span class="card-title">Santiago → Puerto Natales</span><span class="card-date">Sáb 7 nov</span></div>
+    <div class="card-body">
+      <ul class="tl">
+        <li class="tl-item"><span class="tl-time">5:46 AM</span><div class="tl-text"><b>Llegada SCL — Arturo Merino Benítez</b><small>4 horas de espera · desayuno y descanso en el aeropuerto</small></div></li>
+        <li class="tl-item"><span class="tl-time">6:59 AM</span><div class="tl-text"><b>Check-in Sky Airline en SCL</b><small>Mínimo 3 horas antes del vuelo · mostrador Sky</small><a class="map-link" href="https://maps.google.com/?q=Aeropuerto+Arturo+Merino+Benitez+Santiago" target="_blank" rel="noopener">📍 Google Maps</a></div></li>
+        <li class="tl-item"><span class="tl-time">9:59 AM</span><div class="tl-text"><b>Vuelo H2 2613 — Sale SCL</b><small>Puerto Natales (PNT) · ~4h 38m</small></div></li>
+        <li class="tl-item"><span class="tl-time">2:37 PM</span><div class="tl-text"><b>Llegada PNT — Teniente Julio Gallardo</b><a class="map-link" href="https://maps.google.com/?q=Aeropuerto+Teniente+Julio+Gallardo+Puerto+Natales" target="_blank" rel="noopener">📍 Google Maps</a></div></li>
+        <li class="tl-item"><span class="tl-time">3:45 PM</span><div class="tl-text"><b>Entrega vehículo — Natales Rentals</b><small>Jetour X70 · en el aeropuerto PNT</small></div></li>
+        <li class="tl-item"><span class="tl-time">~4:00 PM</span><div class="tl-text"><b>Traslado a Cabaña Aquiles</b><small>Eduardo Mercado, Puerto Natales</small><a class="map-link" href="https://maps.google.com/?q=Eduardo+Mercado+Puerto+Natales+Chile" target="_blank" rel="noopener">📍 Google Maps</a></div></li>
+        <li class="tl-item"><span class="tl-time">Tarde</span><div class="tl-text"><b>Baño y descanso en cabaña</b></div></li>
+        <li class="tl-item"><span class="tl-time">Noche</span><div class="tl-text"><b>Salir a cenar al pueblo</b><small>Centro de Puerto Natales</small></div></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ DÍA 3 ═══════════════ -->
+<div id="d3" class="section">
+  <div class="card">
+    <div class="card-head"><span class="card-tag">Día 3</span><span class="card-title">Puerto Natales — libre</span><span class="card-date">Dom 8 nov</span></div>
+    <div class="card-body">
+      <ul class="tl">
+        <li class="tl-item"><span class="tl-time">Mañana</span><div class="tl-text"><b>Desayuno y recorrido por el pueblo</b><a class="map-link" href="https://maps.google.com/?q=Plaza+de+Armas+Puerto+Natales" target="_blank" rel="noopener">📍 Plaza de Armas</a></div></li>
+        <li class="tl-item"><span class="tl-time">Tarde</span><div class="tl-text"><b>Tour en vehículo por los alrededores</b><small>Por definir</small></div></li>
+        <li class="tl-item"><span class="tl-time">Tarde</span><div class="tl-text"><b>Supermercado</b><small>Compras para los días de trekking</small></div></li>
+        <li class="tl-item"><span class="tl-time">Tarde</span><div class="tl-text"><b>Farmacia</b><small>Pastillas y medicamentos para el viaje</small></div></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ DÍA 4 ═══════════════ -->
+<div id="d4" class="section">
+  <div class="card">
+    <div class="card-head"><span class="card-tag">Día 4</span><span class="card-title">Base Torres — trekking</span><span class="card-date">Lun 9 nov</span></div>
+    <div class="card-body">
+      <div class="trek-stats">
+        <div class="stat"><span class="stat-val">22 km</span><span class="stat-lbl">ida y vuelta</span></div>
+        <div class="stat"><span class="stat-val">~11.5h</span><span class="stat-lbl">duración total</span></div>
+        <div class="stat"><span class="stat-val">845 m</span><span class="stat-lbl">desnivel</span></div>
+      </div>
+      <div class="alert-block"><b>Salida muy temprana — 4:50 AM</b>Preparar mochilas, ropa y desayuno la noche anterior.</div>
+      <ul class="tl">
+        <li class="tl-item"><span class="tl-time">4:50 AM</span><div class="tl-text"><b>Salida desde Puerto Natales en Jetour X70</b><small>Ruta hacia Torres del Paine · ~2 horas</small><a class="map-link" href="https://waze.com/ul?q=Las+Torres+Torres+del+Paine+Chile" target="_blank" rel="noopener">🧭 Waze</a></div></li>
+        <li class="tl-item"><span class="tl-time">~6:50 AM</span><div class="tl-text"><b>Llegada sector Las Torres</b><small>Control de entrada · presentar entradas al parque</small></div></li>
+        <li class="tl-item"><span class="tl-time">7:00 AM</span><div class="tl-text"><b>Inicio del trekking a Base Torres</b><small>Sendero Valle del Ascencio · morrena de roca suelta al final</small></div></li>
+        <li class="tl-item"><span class="tl-time">~1:00 PM</span><div class="tl-text"><b>Mirador Base Torres</b><small>Vista de las tres torres graníticas · descanso y almuerzo</small></div></li>
+        <li class="tl-item"><span class="tl-time">~1:30 PM</span><div class="tl-text"><b>Inicio del descenso</b></div></li>
+        <li class="tl-item"><span class="tl-time">6:30 PM</span><div class="tl-text"><b>Llegada al estacionamiento</b><small>Subirse al Jetour X70</small></div></li>
+        <li class="tl-item"><span class="tl-time">~8:30 PM</span><div class="tl-text"><b>Llegada a Puerto Natales</b></div></li>
+        <li class="tl-item"><span class="tl-time">9:00 PM</span><div class="tl-text"><b>Devolución vehículo — Natales Rentals</b><small>Blanco Encalada 574, Puerto Natales</small><a class="map-link" href="https://maps.google.com/?q=Blanco+Encalada+574+Puerto+Natales+Chile" target="_blank" rel="noopener">📍 Google Maps</a></div></li>
+        <li class="tl-item"><span class="tl-time">Noche</span><div class="tl-text"><b>Regreso a Cabaña Aquiles</b><small>Descanso</small></div></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ DÍA 5 ═══════════════ -->
+<div id="d5" class="section">
+  <div class="card">
+    <div class="card-head"><span class="card-tag">Día 5</span><span class="card-title">Camping Grey — catamarán</span><span class="card-date">Mar 10 nov</span></div>
+    <div class="card-body">
+      <div class="alert-block"><b>Bus Sale a las 7:00 AM</b>Terminal Bus Sur — Av. Baquedano 534, Puerto Natales</div>
+      <ul class="tl">
+        <li class="tl-item"><span class="tl-time">6:30 AM</span><div class="tl-text"><b>Desayuno en Cabaña Aquiles</b></div></li>
+        <li class="tl-item"><span class="tl-time">7:00 AM</span><div class="tl-text"><b>Bus Sur — salida Puerto Natales</b><small>Terminal Av. Baquedano 534 · destino Hotel Grey</small><a class="map-link" href="https://maps.google.com/?q=Terminal+Bus+Sur+Baquedano+534+Puerto+Natales" target="_blank" rel="noopener">📍 Google Maps</a></div></li>
+        <li class="tl-item"><span class="tl-time">11:30 AM</span><div class="tl-text"><b>Llegada Hotel Grey</b><small>Check-in · descanso · almuerzo propio</small></div></li>
+        <li class="tl-item"><span class="tl-time">3:00 PM</span><div class="tl-text"><b>Check-in Catamarán Grey III</b><small>Presentar comprobante de reserva</small></div></li>
+        <li class="tl-item"><span class="tl-time">3:15 PM</span><div class="tl-text"><b>Caminata a zona de embarque</b><small>30-45 min por Playa Grey</small></div></li>
+        <li class="tl-item"><span class="tl-time">4:00 PM</span><div class="tl-text"><b>Zarpe Catamarán Grey III</b><small>Navegación con vista al Glaciar Grey</small></div></li>
+        <li class="tl-item"><span class="tl-time">5:30 PM</span><div class="tl-text"><b>Llegada Refugio / Camping Grey</b></div></li>
+        <li class="tl-item"><span class="tl-time">6:30–9 PM</span><div class="tl-text"><b>Cena incluida en Camping Grey</b><small>Noche en camping propio</small></div></li>
+      </ul>
+      <div class="info-block">
+        <h4>Horario de servicios — Camping Grey</h4>
+        <table class="horario">
+          <tr><td>Desayuno</td><td>6:30 AM — 9:00 AM</td></tr>
+          <tr><td>Almuerzo</td><td>12:00 PM — 2:00 PM</td></tr>
+          <tr><td>Cena</td><td>6:30 PM — 9:00 PM</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ DÍA 6 ═══════════════ -->
+<div id="d6" class="section">
+  <div class="card">
+    <div class="card-head"><span class="card-tag">Día 6</span><span class="card-title">Glaciar Grey + Paine Grande</span><span class="card-date">Mié 11 nov</span></div>
+    <div class="card-body">
+      <div class="trek-stats">
+        <div class="stat"><span class="stat-val">5h</span><span class="stat-lbl">actividad glaciar</span></div>
+        <div class="stat"><span class="stat-val">2.5h</span><span class="stat-lbl">sobre el hielo</span></div>
+        <div class="stat"><span class="stat-val">11 km</span><span class="stat-lbl">Grey → Paine Grande</span></div>
+      </div>
+      <ul class="tl">
+        <li class="tl-item"><span class="tl-time">6:30 AM</span><div class="tl-text"><b>Desayuno en Camping Grey</b><small>6:30 AM — 9:00 AM</small></div></li>
+        <li class="tl-item"><span class="tl-time">8:00 AM</span><div class="tl-text"><b>Caminata a Campamento Base Grey</b><small>15 minutos desde Refugio Grey</small></div></li>
+        <li class="tl-item"><span class="tl-time">8:30 AM</span><div class="tl-text"><b>Inicio Ice Hike — Glaciar Grey</b><small>Charla de seguridad · técnicas de desplazamiento en hielo</small></div></li>
+        <li class="tl-item"><span class="tl-time">9:00 AM</span><div class="tl-text"><b>2.5 horas sobre el glaciar</b><small>Grietas, ríos, lagunas, túneles y cuevas de hielo</small></div></li>
+        <li class="tl-item"><span class="tl-time">1:30 PM</span><div class="tl-text"><b>Fin de actividad — regreso al Camping Grey</b></div></li>
+        <li class="tl-item"><span class="tl-time">12–2 PM</span><div class="tl-text"><b>Almuerzo en Camping Grey</b></div></li>
+        <li class="tl-item"><span class="tl-time">~2:30 PM</span><div class="tl-text"><b>Inicio caminata Grey → Paine Grande</b><small>11 km · ~4 horas</small></div></li>
+        <li class="tl-item"><span class="tl-time">~6:30 PM</span><div class="tl-text"><b>Llegada Camping Paine Grande</b></div></li>
+        <li class="tl-item"><span class="tl-time">6:30–9 PM</span><div class="tl-text"><b>Cena incluida en Camping Paine Grande</b><small>Noche en camping propio</small></div></li>
+      </ul>
+      <div class="info-block">
+        <h4>Horario de servicios — Camping Paine Grande</h4>
+        <table class="horario">
+          <tr><td>Desayuno</td><td>6:30 AM — 9:00 AM</td></tr>
+          <tr><td>Almuerzo</td><td>12:00 PM — 2:00 PM</td></tr>
+          <tr><td>Cena</td><td>6:30 PM — 9:00 PM</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ DÍA 7 ═══════════════ -->
+<div id="d7" class="section">
+  <div class="card">
+    <div class="card-head"><span class="card-tag">Día 7</span><span class="card-title">Miradores + regreso</span><span class="card-date">Jue 12 nov</span></div>
+    <div class="card-body">
+      <div class="trek-stats">
+        <div class="stat"><span class="stat-val">9 km</span><span class="stat-lbl">ida y vuelta</span></div>
+        <div class="stat"><span class="stat-val">2h 45m</span><span class="stat-lbl">caminata total</span></div>
+        <div class="stat"><span class="stat-val">30 min</span><span class="stat-lbl">catamarán</span></div>
+      </div>
+      <ul class="tl">
+        <li class="tl-item"><span class="tl-time">6:30 AM</span><div class="tl-text"><b>Desayuno en Camping Paine Grande</b><small>6:30 AM — 9:00 AM</small></div></li>
+        <li class="tl-item"><span class="tl-time">10:45 AM</span><div class="tl-text"><b>Check-in Catamarán Lago Pehoé</b><small>Hielos Patagónicos · presentar comprobante 15 min antes</small></div></li>
+        <li class="tl-item"><span class="tl-time">11:20 AM</span><div class="tl-text"><b>Zarpe — Paine Grande → Pudeto</b><small>30 minutos · Hielos Patagónicos</small></div></li>
+        <li class="tl-item"><span class="tl-time">11:50 AM</span><div class="tl-text"><b>Llegada a Pudeto</b></div></li>
+        <li class="tl-item"><span class="tl-time">12:00 PM</span><div class="tl-text"><b>Inicio recorrido miradores</b><small>Mirador Pehoé → Salto Grande → Mirador Cuernos · 9 km ida y vuelta</small></div></li>
+        <li class="tl-item"><span class="tl-time">~2:15 PM</span><div class="tl-text"><b>Mirador Cuernos</b><small>15 minutos de descanso</small></div></li>
+        <li class="tl-item"><span class="tl-time">~2:45 PM</span><div class="tl-text"><b>Regreso a Pudeto</b></div></li>
+        <li class="tl-item"><span class="tl-time">3:00 PM</span><div class="tl-text"><b>Bus Pudeto → Hostería Pehoé</b></div></li>
+        <li class="tl-item"><span class="tl-time">3:30 PM</span><div class="tl-text"><b>Café en Hostería Pehoé</b><small>Descanso con vista al lago y los Cuernos</small><a class="map-link" href="https://maps.google.com/?q=Hosteria+Pehoe+Torres+del+Paine" target="_blank" rel="noopener">📍 Google Maps</a></div></li>
+        <li class="tl-item"><span class="tl-time">6:00 PM</span><div class="tl-text"><b>Bus Sur — Hostería Pehoé → Puerto Natales</b></div></li>
+        <li class="tl-item"><span class="tl-time">~8:00 PM</span><div class="tl-text"><b>Llegada Puerto Natales</b></div></li>
+        <li class="tl-item"><span class="tl-time">Noche</span><div class="tl-text"><b>Cena en el pueblo · Cabaña Aquiles</b></div></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ DÍA 8 ═══════════════ -->
+<div id="d8" class="section">
+  <div class="card">
+    <div class="card-head"><span class="card-tag">Día 8</span><span class="card-title">Puerto Natales — libre</span><span class="card-date">Vie 13 nov</span></div>
+    <div class="card-body">
+      <ul class="tl">
+        <li class="tl-item"><span class="tl-time">Mañana</span><div class="tl-text"><b>Levantarse tarde · descanso</b></div></li>
+        <li class="tl-item"><span class="tl-time">Tarde</span><div class="tl-text"><b>Recorrer Puerto Natales</b><small>Plaza de Armas · Costanera · tiendas</small><a class="map-link" href="https://maps.google.com/?q=Puerto+Natales+Chile" target="_blank" rel="noopener">📍 Google Maps</a></div></li>
+        <li class="tl-item"><span class="tl-time">Noche</span><div class="tl-text"><b>Salir de fiesta en Puerto Natales</b></div></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ DÍA 9 ═══════════════ -->
+<div id="d9" class="section">
+  <div class="card">
+    <div class="card-head"><span class="card-tag">Día 9</span><span class="card-title">Vuelo a Santiago</span><span class="card-date">Sáb 14 nov</span></div>
+    <div class="card-body">
+      <ul class="tl">
+        <li class="tl-item"><span class="tl-time">Mañana</span><div class="tl-text"><b>Desayuno en Cabaña Aquiles</b></div></li>
+        <li class="tl-item"><span class="tl-time">Mediodía</span><div class="tl-text"><b>Almuerzo en el pueblo</b></div></li>
+        <li class="tl-item"><span class="tl-time">~12:30 PM</span><div class="tl-text"><b>Checkout Cabaña Aquiles · maletas y baño</b></div></li>
+        <li class="tl-item"><span class="tl-time">1:00 PM</span><div class="tl-text"><b>Uber al aeropuerto PNT</b><small>~10-15 minutos</small></div></li>
+        <li class="tl-item"><span class="tl-time">1:15 PM</span><div class="tl-text"><b>Llegada aeropuerto Teniente Julio Gallardo</b><small>Check-in Sky Airline</small><a class="map-link" href="https://maps.google.com/?q=Aeropuerto+Teniente+Julio+Gallardo+Puerto+Natales" target="_blank" rel="noopener">📍 Google Maps</a></div></li>
+        <li class="tl-item"><span class="tl-time">3:32 PM</span><div class="tl-text"><b>Vuelo H2 2614 — Sale PNT</b><small>Santiago (SCL) · ~4h 42m</small></div></li>
+        <li class="tl-item"><span class="tl-time">8:14 PM</span><div class="tl-text"><b>Llegada SCL</b><small>Espera en aeropuerto hasta madrugada</small></div></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ DÍA 10 ═══════════════ -->
+<div id="d10" class="section">
+  <div class="card">
+    <div class="card-head"><span class="card-tag">Día 10</span><span class="card-title">Regreso a San José</span><span class="card-date">Dom 15 nov</span></div>
+    <div class="card-body">
+      <ul class="tl">
+        <li class="tl-item"><span class="tl-time">1:02 AM</span><div class="tl-text"><b>Vuelo CM 276 — Sale SCL</b><small>Ciudad de Panamá (PTY) · 5h 57m · Boeing 737 MAX 8</small></div></li>
+        <li class="tl-item"><span class="tl-time">5:59 AM</span><div class="tl-text"><b>Llegada PTY — Tocumen</b><small>Escala: 41 minutos</small></div></li>
+        <li class="tl-item"><span class="tl-time">6:40 AM</span><div class="tl-text"><b>Vuelo CM 787 — Sale PTY</b><small>San José (SJO) · 1h 22m · Boeing 737 MAX 8</small></div></li>
+        <li class="tl-item"><span class="tl-time">7:02 AM</span><div class="tl-text"><b>Llegada SJO — Juan Santamaría</b><small>Bienvenidos de vuelta a Costa Rica</small></div></li>
+      </ul>
+      <div class="ok-block">Viaje completado · 10 días · Patagonia 2026 🏔️</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ HOSPEDAJE ═══════════════ -->
+<div id="hospedaje" class="section">
+  <p class="sec-title">Hospedaje</p>
+  <div class="card">
+    <div class="card-head"><span class="card-tag">PNT</span><span class="card-title">Cabaña Aquiles</span></div>
+    <div class="card-body">
+      <div class="info-block">
+        <h4>Dirección</h4>
+        Eduardo Mercado, Puerto Natales, Chile · CP 6160000
+        <br><a class="map-link" href="https://maps.google.com/?q=Eduardo+Mercado+Puerto+Natales+Chile" target="_blank" rel="noopener">📍 Google Maps</a>
+      </div>
+      <div class="info-block">
+        <h4>Noches reservadas</h4>
+        Del 7 al 14 de noviembre
+        <br><small style="color:var(--stone);font-size:13px;">Sáb 7 · Dom 8 · Lun 9 · Mar 10 · Mié 11 · Jue 12 · Vie 13 · Sáb 14</small>
+      </div>
+      <div class="alert-block"><b>Checkout sábado 14 nov</b>Hacer maletas antes del almuerzo. Salida hacia aeropuerto a la 1:00 PM.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-tag">PARQUE</span><span class="card-title">Camping dentro del parque</span></div>
+    <div class="card-body">
+      <div class="info-block">
+        <h4>Camping Grey — Mar 10 nov</h4>
+        <div class="pax-row"><span class="pax-label">Reservación</span><span class="camping-id">1777929036</span></div>
+        <div class="pax-row"><span class="pax-label">A nombre de</span><span class="pax-val">Adrian Rodríguez</span></div>
+        <table class="horario" style="margin-top:0.5rem;">
+          <tr><td>Desayuno</td><td>6:30 AM — 9:00 AM</td></tr>
+          <tr><td>Almuerzo</td><td>12:00 PM — 2:00 PM</td></tr>
+          <tr><td>Cena</td><td>6:30 PM — 9:00 PM</td></tr>
+        </table>
+      </div>
+      <div class="info-block">
+        <h4>Camping Paine Grande — Mié 11 nov</h4>
+        <div class="pax-row"><span class="pax-label">Reservación</span><span class="camping-id">1777929054</span></div>
+        <div class="pax-row"><span class="pax-label">A nombre de</span><span class="pax-val">Adrian Rodríguez</span></div>
+        <table class="horario" style="margin-top:0.5rem;">
+          <tr><td>Desayuno</td><td>6:30 AM — 9:00 AM</td></tr>
+          <tr><td>Almuerzo</td><td>12:00 PM — 2:00 PM</td></tr>
+          <tr><td>Cena</td><td>6:30 PM — 9:00 PM</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ VEHÍCULO ═══════════════ -->
+<div id="vehiculo" class="section">
+  <p class="sec-title">Vehículo</p>
+  <div class="card">
+    <div class="card-head"><span class="card-tag">AUTO</span><span class="card-title">Natales Rentals — Jetour X70</span></div>
+    <div class="card-body">
+      <div class="vehicle-row">
+        <div class="vehicle-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg></div>
+        <div class="vehicle-info"><h4>Jetour X70 — SUV</h4><p>Natales Rentals · 7 pasajeros</p></div>
+      </div>
+      <div class="info-block">
+        <h4>Recogida</h4>
+        Sábado 7 nov · 3:45 PM<br>Aeropuerto Teniente Julio Gallardo (PNT)
+        <br><a class="map-link" href="https://maps.google.com/?q=Aeropuerto+Teniente+Julio+Gallardo+Puerto+Natales" target="_blank" rel="noopener">📍 Google Maps</a>
+      </div>
+      <div class="info-block">
+        <h4>Devolución</h4>
+        Lunes 9 nov · 9:00 PM<br>Blanco Encalada 574, Puerto Natales
+        <br><a class="map-link" href="https://maps.google.com/?q=Blanco+Encalada+574+Puerto+Natales+Chile" target="_blank" rel="noopener">📍 Google Maps</a>
+      </div>
+      <div class="alert-block"><b>Devolución lunes 9 nov a las 9:00 PM</b>Regresan del trekking ~8:30 PM. Ir directo a devolver el carro antes de la cabaña.</div>
+      <div class="info-block">
+        <h4>Conductores autorizados</h4>
+        <div class="pax-row"><span class="pax-label">Adrian Rodríguez</span><span class="pax-val">CI-207970960</span></div>
+        <div class="pax-row"><span class="pax-label">Emanuel Zamora</span><span class="pax-val">CI-208230660</span></div>
+        <div class="pax-row"><span class="pax-label">Marvin Villalobos</span><span class="pax-val">CI-206910982</span></div>
+        <div class="pax-row"><span class="pax-label">Karol Zamora</span><span class="pax-val">CI-207400890</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /scroll-area -->
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <label class="bnav-btn" for="t-vuelos">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
+    Vuelos
+  </label>
+  <label class="bnav-btn" for="t-pasajeros">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Pasajeros
+  </label>
+  <label class="bnav-btn" for="t-calendario">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Calendario
+  </label>
+  <label class="bnav-btn" for="t-hospedaje">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    Hospedaje
+  </label>
+  <label class="bnav-btn" for="t-vehiculo">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>
+    Vehículo
+  </label>
+</nav>
+
+<script>
+// Opcional: al cambiar de sección vuelve arriba. Si el navegador bloquea JS,
+// la navegación funciona igual porque está hecha solo con HTML y CSS.
+document.addEventListener('change', function (e) {
+  if (e.target && (e.target.name === 'tab' || e.target.name === 'cal')) window.scrollTo(0, 0);
+});
+</script>
+</body>
+</html>
