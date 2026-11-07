@@ -57,3 +57,45 @@ create policy "Edición de asientos desde la página" on public.asientos for upd
 
 -- Tiempo real
 alter publication supabase_realtime add table public.vuelos, public.asientos;
+
+-- ── Gastos (agregado 7 nov 2026) ──
+create table public.tipos_cambio (
+  moneda     text primary key check (moneda in ('USD','CLP','CRC')),
+  por_usd    numeric(12,4) not null check (por_usd > 0),   -- unidades por 1 USD
+  updated_at timestamptz not null default now()
+);
+insert into public.tipos_cambio (moneda, por_usd) values ('USD',1), ('CLP',976.64), ('CRC',452.95);
+
+create table public.gastos (
+  id            uuid primary key default gen_random_uuid(),   -- lo genera el teléfono (permite cola sin señal)
+  fecha         date not null default ((now() at time zone 'America/Punta_Arenas')::date),
+  categoria     text not null check (categoria in ('hospedaje','vehiculo','gasolina','comida','super','tours','camping','transporte','vuelos','otros')),
+  descripcion   text check (descripcion is null or char_length(descripcion) <= 120),
+  monto         numeric(14,2) not null check (monto > 0 and monto < 100000000),
+  moneda        text not null default 'CLP' check (moneda in ('USD','CLP','CRC')),
+  pagado_por    text not null check (pagado_por in ('Nallely','Adrian','Heylin','Emanuel','Karol','Marvin')),
+  participantes text[] not null default array['Nallely','Adrian','Heylin','Emanuel','Karol','Marvin']
+                check (cardinality(participantes) between 1 and 6
+                       and participantes <@ array['Nallely','Adrian','Heylin','Emanuel','Karol','Marvin']),
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index gastos_fecha_idx on public.gastos (fecha desc, created_at desc);
+create trigger gastos_updated_at before update on public.gastos for each row execute function public.set_updated_at();
+create trigger tipos_cambio_updated_at before update on public.tipos_cambio for each row execute function public.set_updated_at();
+
+alter table public.gastos enable row level security;
+alter table public.tipos_cambio enable row level security;
+revoke all on public.gastos, public.tipos_cambio from anon, authenticated;
+grant select, insert, update, delete on public.gastos to anon, authenticated;
+grant select on public.tipos_cambio to anon, authenticated;
+grant update (por_usd) on public.tipos_cambio to anon, authenticated;
+create policy "Leer gastos"    on public.gastos for select to anon, authenticated using (true);
+create policy "Agregar gastos" on public.gastos for insert to anon, authenticated with check (true);
+create policy "Editar gastos"  on public.gastos for update to anon, authenticated using (true) with check (true);
+create policy "Borrar gastos"  on public.gastos for delete to anon, authenticated using (true);
+create policy "Leer tipos de cambio"   on public.tipos_cambio for select to anon, authenticated using (true);
+create policy "Editar tipos de cambio" on public.tipos_cambio for update to anon, authenticated using (moneda <> 'USD') with check (moneda <> 'USD');
+
+alter table public.gastos replica identity full;
+alter publication supabase_realtime add table public.gastos, public.tipos_cambio;
