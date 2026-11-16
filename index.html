@@ -230,6 +230,10 @@ body.editing .card-head [contenteditable="true"],body.editing .cal-strip [conten
 /* ── GASTOS ── */
 .bnav-btn{min-width:0;}
 .g-total{background:var(--deep);color:white;border-radius:var(--radius);padding:1rem;margin-bottom:1rem;}
+.g-total-top{display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:0.2rem;}
+.g-base{display:inline-flex;background:rgba(255,255,255,0.12);border-radius:8px;padding:2px;}
+.g-base button{border:none;background:none;color:#BFDBFE;font:700 12px 'Inter',sans-serif;padding:0.35rem 0.55rem;border-radius:6px;min-height:30px;}
+.g-base button[aria-pressed="true"]{background:white;color:var(--deep);}
 .g-total-lbl{font-size:12px;color:#93C5FD;font-weight:600;letter-spacing:0.03em;}
 .g-total-val{font-size:2rem;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums;}
 .g-total-sub{font-size:13px;color:#BFDBFE;margin-top:2px;font-variant-numeric:tabular-nums;}
@@ -967,7 +971,12 @@ label.bnav-btn,label.cal-day-btn{cursor:pointer;}
   <p class="sec-title">Gastos del viaje</p>
 
   <div class="g-total">
-    <div class="g-total-lbl">TOTAL DEL GRUPO</div>
+    <div class="g-total-top">
+      <div class="g-total-lbl">TOTAL DEL GRUPO</div>
+      <div class="g-base" id="g-base" role="group" aria-label="Ver montos en">
+        <button type="button" data-base="USD">USD</button><button type="button" data-base="CLP">CLP</button><button type="button" data-base="CRC">CRC</button>
+      </div>
+    </div>
     <div class="g-total-val" id="g-total">$0</div>
     <div class="g-total-sub" id="g-total-sub">≈ US$0 · ₡0</div>
     <div class="g-total-row">
@@ -1058,7 +1067,7 @@ label.bnav-btn,label.cal-day-btn{cursor:pointer;}
         <div class="g-field"><label for="g-r-clp">CLP por 1 USD</label><input class="g-input" id="g-r-clp" inputmode="decimal"></div>
         <div class="g-field"><label for="g-r-crc">CRC por 1 USD</label><input class="g-input" id="g-r-crc" inputmode="decimal"></div>
       </div>
-      <p class="g-hint" style="margin-top:0.5rem;">Los totales y saldos se calculan en pesos chilenos. Si cambias el tipo de cambio, se actualiza para todos.</p>
+      <p class="g-hint" style="margin-top:0.5rem;">Se usa para convertir los gastos a la moneda elegida arriba (USD / CLP / CRC). Si lo cambias, se actualiza para todos.</p>
     </div>
   </div>
 </div>
@@ -1455,22 +1464,33 @@ document.addEventListener('change', function (e) {
   // ── Formatos ──
   var nf0 = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 });
   var nf2 = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Todos los montos con 2 decimales
   function money(v, cur) {
-    if (cur === 'USD') return 'US$' + nf2.format(v);
-    if (cur === 'CRC') return '₡' + nf0.format(v);
-    return '$' + nf0.format(Math.round(v));
+    var t = nf2.format(Math.abs(v) < 0.005 ? 0 : v);
+    if (cur === 'USD') return 'US$' + t;
+    if (cur === 'CRC') return '₡' + t;
+    return '$' + t;
   }
-  function toCLP(monto, cur) { return monto * (state.rates.CLP / (state.rates[cur] || 1)); }
-  function fromCLP(clp, cur) { return clp * ((state.rates[cur] || 1) / state.rates.CLP); }
+  function cents(v) { return Math.round(v * 100); } // a centavos enteros
+  function conv(monto, from, to) { return monto * ((state.rates[to] || 1) / (state.rates[from] || 1)); }
+  function toBase(monto, cur) { return conv(monto, cur, base); }
+  // Moneda en que se ven totales y saldos (por teléfono). Por defecto, la más usada en los gastos.
+  var K_BASE = 'patagonia-gastos-base';
+  var base = ls(function (s) { return s.getItem(K_BASE); });
+  var baseFixed = !!base;
+  function autoBase() {
+    if (!state.gastos.length) return 'CLP';
+    var n = { USD: 0, CLP: 0, CRC: 0 };
+    state.gastos.forEach(function (g) { if (n[g.moneda] != null) n[g.moneda]++; });
+    return ['USD', 'CLP', 'CRC'].sort(function (a, b) { return n[b] - n[a]; })[0];
+  }
+  if (!base) base = autoBase();
+  function others() { return ['USD', 'CLP', 'CRC'].filter(function (c) { return c !== base; }); }
   function parseNum(str, cur) {
     var s = String(str || '').replace(/[^\d.,]/g, '');
     if (!s) return NaN;
-    if (cur === 'CLP' || cur === 'CRC') {
-      // Sin decimales: "12.500" o "12,500" = doce mil quinientos
-      var m = s.match(/^(\d+)[.,](\d{1,2})$/);
-      if (m && cur === 'CRC') return parseFloat(m[1] + '.' + m[2]);
-      return parseInt(s.replace(/[.,]/g, ''), 10);
-    }
+    // El último separador seguido de 1–2 dígitos es decimal ("12.500,50", "120,5");
+    // seguido de 3 dígitos es de miles ("12.500" = doce mil quinientos)
     var lastDot = s.lastIndexOf('.'), lastCom = s.lastIndexOf(',');
     var dec = Math.max(lastDot, lastCom);
     if (dec > -1 && s.length - dec - 1 <= 2) s = s.slice(0, dec).replace(/[.,]/g, '') + '.' + s.slice(dec + 1);
@@ -1490,33 +1510,40 @@ document.addEventListener('change', function (e) {
   }
 
   // ── Cálculos ──
+  // Todo se calcula en centavos enteros: las partes siempre suman exactamente el total
+  // y los saldos del grupo suman cero, sin centavos perdidos.
   function compute() {
     var total = 0, byCat = {}, paid = {}, owes = {};
     PEOPLE.forEach(function (p) { paid[p] = 0; owes[p] = 0; });
-    state.gastos.forEach(function (g) {
-      var clp = toCLP(+g.monto, g.moneda);
-      total += clp;
-      byCat[g.categoria] = (byCat[g.categoria] || 0) + clp;
-      if (paid[g.pagado_por] != null) paid[g.pagado_por] += clp;
-      var parts = (g.participantes || []).filter(function (p) { return owes[p] != null; });
+    var ordered = state.gastos.slice().sort(function (a, b) {
+      return (a.created_at || '') < (b.created_at || '') ? -1 : (a.created_at || '') > (b.created_at || '') ? 1 : (a.id < b.id ? -1 : 1);
+    });
+    ordered.forEach(function (g, gi) {
+      var c = cents(toBase(+g.monto, g.moneda));
+      total += c;
+      byCat[g.categoria] = (byCat[g.categoria] || 0) + c;
+      if (paid[g.pagado_por] != null) paid[g.pagado_por] += c;
+      var parts = PEOPLE.filter(function (p) { return (g.participantes || []).indexOf(p) > -1; });
       if (!parts.length) return;
-      var share = clp / parts.length;
-      parts.forEach(function (p) { owes[p] += share; });
+      var base = Math.floor(c / parts.length), rem = c - base * parts.length;
+      // Los centavos sobrantes (máx. 5) se rotan entre personas de un gasto a otro
+      parts.forEach(function (p, k) { owes[p] += base + (((k - gi) % parts.length + parts.length) % parts.length < rem ? 1 : 0); });
     });
     var bal = {}; PEOPLE.forEach(function (p) { bal[p] = paid[p] - owes[p]; });
     // Transferencias mínimas: el que más debe le paga al que más puso
     var deb = [], cred = [];
-    PEOPLE.forEach(function (p) { var b = Math.round(bal[p]); if (b < -1) deb.push({ p: p, v: -b }); else if (b > 1) cred.push({ p: p, v: b }); });
+    PEOPLE.forEach(function (p) { var b = bal[p]; if (b < 0) deb.push({ p: p, v: -b }); else if (b > 0) cred.push({ p: p, v: b }); });
     deb.sort(function (a, b) { return b.v - a.v; }); cred.sort(function (a, b) { return b.v - a.v; });
     var tx = [], i = 0, j = 0;
     while (i < deb.length && j < cred.length) {
       var v = Math.min(deb[i].v, cred[j].v);
-      if (v >= 1) tx.push({ from: deb[i].p, to: cred[j].p, v: v });
+      if (v > 0) tx.push({ from: deb[i].p, to: cred[j].p, v: v / 100 });
       deb[i].v -= v; cred[j].v -= v;
-      if (deb[i].v < 1) i++;
-      if (cred[j].v < 1) j++;
+      if (deb[i].v === 0) i++;
+      if (cred[j].v === 0) j++;
     }
-    return { total: total, byCat: byCat, paid: paid, owes: owes, bal: bal, tx: tx };
+    var out = function (o) { var r = {}; Object.keys(o).forEach(function (k) { r[k] = o[k] / 100; }); return r; };
+    return { total: total / 100, byCat: out(byCat), paid: out(paid), owes: out(owes), bal: out(bal), balC: bal, tx: tx };
   }
 
   // ── Render ──
@@ -1524,24 +1551,25 @@ document.addEventListener('change', function (e) {
 
   function render() {
     var c = compute();
-    $('g-total').textContent = money(c.total, 'CLP');
-    $('g-total-sub').textContent = '≈ ' + money(fromCLP(c.total, 'USD'), 'USD') + ' · ' + money(fromCLP(c.total, 'CRC'), 'CRC');
-    $('g-pp').textContent = money(c.total / PEOPLE.length, 'CLP');
+    document.querySelectorAll('#g-base [data-base]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.base === base); });
+    $('g-total').textContent = money(c.total, base);
+    $('g-total-sub').textContent = '≈ ' + others().map(function (o) { return money(conv(c.total, base, o), o); }).join(' · ');
+    $('g-pp').textContent = money(c.total / PEOPLE.length, base);
     $('g-count').textContent = state.gastos.length;
     $('g-sync').hidden = !queue.length;
     $('g-sync-txt').textContent = queue.length === 1 ? '1 cambio sin subir · se sube al volver la señal' : queue.length + ' cambios sin subir · se suben al volver la señal';
 
     // Saldos
     $('g-balances').innerHTML = PEOPLE.map(function (p) {
-      var b = Math.round(c.bal[p]), cls = b > 0 ? 'g-pos' : (b < 0 ? 'g-neg' : 'g-zero');
-      var lbl = b > 0 ? 'le deben ' : (b < 0 ? 'debe ' : 'a mano');
-      return '<div class="g-bal"><div><div class="g-bal-name">' + p + '</div><div class="g-bal-det">Pagó ' + money(c.paid[p], 'CLP') + ' · le toca ' + money(c.owes[p], 'CLP') + '</div></div>' +
-        '<div class="g-bal-amt ' + cls + '">' + (b === 0 ? lbl : lbl + money(Math.abs(b), 'CLP')) + '</div></div>';
+      var bc = c.balC[p], b = bc / 100, cls = bc > 0 ? 'g-pos' : (bc < 0 ? 'g-neg' : 'g-zero');
+      var lbl = bc > 0 ? 'le deben ' : (bc < 0 ? 'debe ' : 'a mano');
+      return '<div class="g-bal"><div><div class="g-bal-name">' + p + '</div><div class="g-bal-det">Pagó ' + money(c.paid[p], base) + ' · le toca ' + money(c.owes[p], base) + '</div></div>' +
+        '<div class="g-bal-amt ' + cls + '">' + (bc === 0 ? lbl : lbl + money(Math.abs(b), base)) + '</div></div>';
     }).join('');
     $('g-settle').innerHTML = c.tx.length
       ? '<p class="g-hint" style="margin-top:0.75rem;font-weight:700;">Para quedar a mano:</p>' + c.tx.map(function (t) {
-          return '<div class="g-settle"><span><b>' + t.from + '</b> → <b>' + t.to + '</b></span><span class="amt">' + money(t.v, 'CLP') +
-            '<small style="display:block;font-weight:500;color:var(--stone);font-size:11px;text-align:right;">≈ ' + money(fromCLP(t.v, 'USD'), 'USD') + '</small></span></div>';
+          return '<div class="g-settle"><span><b>' + t.from + '</b> → <b>' + t.to + '</b></span><span class="amt">' + money(t.v, base) +
+            '<small style="display:block;font-weight:500;color:var(--stone);font-size:11px;text-align:right;">≈ ' + money(conv(t.v, base, base === 'CLP' ? 'USD' : 'CLP'), base === 'CLP' ? 'USD' : 'CLP') + '</small></span></div>';
         }).join('')
       : (state.gastos.length ? '<div class="ok-block" style="margin-bottom:0;">Todos están a mano ✓</div>' : '');
 
@@ -1551,7 +1579,7 @@ document.addEventListener('change', function (e) {
     $('g-cats-sum').innerHTML = cats.length ? cats.map(function (k) {
       var v = c.byCat[k.id], pct = c.total ? Math.round(v / c.total * 100) : 0;
       return '<div class="g-cat"><span class="g-cat-ic" aria-hidden="true">' + k.ic + '</span><span class="g-cat-name">' + k.name + ' <span class="g-hint">' + pct + '%</span></span>' +
-        '<span class="g-cat-val">' + money(v, 'CLP') + '</span><div class="g-bar"><i style="width:' + Math.max(3, v / max * 100) + '%"></i></div></div>';
+        '<span class="g-cat-val">' + money(v, base) + '</span><div class="g-bar"><i style="width:' + Math.max(3, v / max * 100) + '%"></i></div></div>';
     }).join('') : '<div class="g-empty">Aún no hay gastos.</div>';
 
     // Filtro y lista
@@ -1564,16 +1592,17 @@ document.addEventListener('change', function (e) {
     $('g-edit-hint').hidden = !list.length;
     if (!list.length) { $('g-list').innerHTML = '<div class="g-empty">' + (state.gastos.length ? 'Sin gastos para ' + esc(filter) + '.' : 'Toca <b>Agregar gasto</b> para registrar el primero.') + '</div>'; return; }
     var html = '', day = null, dayTotal = {};
-    list.forEach(function (g) { dayTotal[g.fecha] = (dayTotal[g.fecha] || 0) + toCLP(+g.monto, g.moneda); });
+    list.forEach(function (g) { dayTotal[g.fecha] = (dayTotal[g.fecha] || 0) + cents(toBase(+g.monto, g.moneda)); });
+    Object.keys(dayTotal).forEach(function (d) { dayTotal[d] /= 100; });
     list.forEach(function (g) {
-      if (g.fecha !== day) { day = g.fecha; html += '<div class="g-day"><span>' + fmtDay(day) + '</span><span>' + money(dayTotal[day], 'CLP') + '</span></div>'; }
+      if (g.fecha !== day) { day = g.fecha; html += '<div class="g-day"><span>' + fmtDay(day) + '</span><span>' + money(dayTotal[day], base) + '</span></div>'; }
       var k = CAT[g.categoria] || CAT.otros, parts = g.participantes || [];
       var who = parts.length === PEOPLE.length ? 'entre todos' : 'entre ' + parts.join(', ');
-      var conv = g.moneda !== 'CLP' ? '<small>≈ ' + money(toCLP(+g.monto, g.moneda), 'CLP') + '</small>' : '';
+      var eq = g.moneda !== base ? '<small>≈ ' + money(cents(toBase(+g.monto, g.moneda)) / 100, base) + '</small>' : '';
       var pend = isPending(g.id) ? ' <span class="g-pend" title="Sin subir">⏳</span>' : '';
       html += '<button type="button" class="g-item" data-id="' + g.id + '" aria-label="Editar ' + esc(g.descripcion || k.name) + ', ' + esc(money(+g.monto, g.moneda)) + '"><span class="g-item-ic" aria-hidden="true">' + k.ic + '</span>' +
         '<span><span class="g-item-t">' + esc(g.descripcion || k.name) + pend + '</span><span class="g-item-s" style="display:block;">Pagó ' + esc(g.pagado_por) + ' · ' + esc(who) + '</span></span>' +
-        '<span class="g-item-a">' + money(+g.monto, g.moneda) + conv + '</span>' +
+        '<span class="g-item-a">' + money(+g.monto, g.moneda) + eq + '</span>' +
         '<span class="g-item-edit" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span></button>';
     });
     $('g-list').innerHTML = html;
@@ -1589,8 +1618,12 @@ document.addEventListener('change', function (e) {
     document.querySelectorAll('#g-cats [data-cat]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.cat === form.cat); });
     document.querySelectorAll('#g-parts [data-part]').forEach(function (b) { b.setAttribute('aria-pressed', form.parts.indexOf(b.dataset.part) > -1); });
     var cur = $('g-moneda').value, n = parseNum($('g-monto').value, cur);
-    $('g-conv').textContent = (n > 0 && cur !== 'CLP') ? '≈ ' + money(toCLP(n, cur), 'CLP') : '';
-    $('g-share').textContent = (n > 0 && form.parts.length) ? money(toCLP(n, cur) / form.parts.length, 'CLP') + ' por persona' : '';
+    $('g-conv').textContent = (n > 0 && cur !== base) ? '≈ ' + money(toBase(n, cur), base) : '';
+    var nc = cents(toBase(n, cur)), np = form.parts.length;
+    if (n > 0 && np) {
+      var lo = Math.floor(nc / np), hi = nc % np ? lo + 1 : lo;
+      $('g-share').textContent = (lo === hi ? money(lo / 100, base) : money(lo / 100, base) + ' – ' + money(hi / 100, base)) + ' por persona';
+    } else $('g-share').textContent = '';
   }
 
   function openForm(g) {
@@ -1600,8 +1633,8 @@ document.addEventListener('change', function (e) {
     $('g-del').hidden = !g;
     $('g-save').textContent = g ? 'Guardar cambios' : 'Guardar';
     $('g-err').textContent = '';
-    $('g-moneda').value = g ? g.moneda : 'CLP';
-    $('g-monto').value = g ? (g.moneda === 'USD' ? nf2.format(+g.monto) : nf0.format(+g.monto)) : '';
+    $('g-moneda').value = g ? g.moneda : base;
+    $('g-monto').value = g ? nf2.format(+g.monto) : '';
     $('g-desc').value = g ? (g.descripcion || '') : '';
     $('g-fecha').value = g ? g.fecha : today();
     $('g-pago').value = g ? g.pagado_por : (ls(function (s) { return s.getItem(K_ME); }) || 'Marvin');
@@ -1665,6 +1698,12 @@ document.addEventListener('change', function (e) {
     var b = e.target.closest('[data-id]'); if (!b) return;
     var g = state.gastos.find(function (x) { return x.id === b.dataset.id; });
     if (g) openForm(g);
+  });
+  $('g-base').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-base]'); if (!b) return;
+    base = b.dataset.base; baseFixed = true;
+    ls(function (s) { s.setItem(K_BASE, base); });
+    render();
   });
   $('g-filter').addEventListener('click', function (e) { var b = e.target.closest('[data-filter]'); if (b) { filter = b.dataset.filter; render(); } });
 
@@ -1737,6 +1776,7 @@ document.addEventListener('change', function (e) {
         if (q.op === 'upsert') server.push(q.row);
       });
       state.gastos = server;
+      if (!baseFixed) base = autoBase();
       r[1].data.forEach(function (x) { state.rates[x.moneda] = +x.por_usd; });
       persist(); render(); paintRates(); flush();
     }).catch(function () { render(); });
