@@ -99,3 +99,8 @@ create policy "Editar tipos de cambio" on public.tipos_cambio for update to anon
 
 alter table public.gastos replica identity full;
 alter publication supabase_realtime add table public.gastos, public.tipos_cambio;
+
+-- ── Categoría Farmacia (16 nov 2026) ──
+alter table public.gastos drop constraint gastos_categoria_check;
+alter table public.gastos add constraint gastos_categoria_check
+  check (categoria in ('hospedaje','vehiculo','gasolina','comida','super','farmacia','tours','camping','transporte','vuelos','otros'));

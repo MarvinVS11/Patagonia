@@ -295,8 +295,21 @@ body.editing .card-head [contenteditable="true"],body.editing .cal-strip [conten
 .g-pend{color:#B45309;}
 .g-empty{text-align:center;color:var(--stone);font-size:14px;padding:1.25rem 0.5rem;}
 .g-rates{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;}
+#gastos .card{scroll-margin-top:110px;}
+.g-view{display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:0.65rem;}
+.g-seg{display:inline-flex;background:#F3F4F6;border-radius:9px;padding:3px;}
+.g-seg button{border:none;background:none;font:700 13px 'Inter',sans-serif;color:var(--stone);padding:0.4rem 0.75rem;border-radius:7px;min-height:32px;}
+.g-seg button[aria-pressed="true"]{background:white;color:var(--deep);box-shadow:0 1px 2px rgba(0,0,0,0.08);}
+.g-fsum{display:flex;justify-content:space-between;align-items:center;gap:0.5rem;background:var(--ice);border-radius:8px;padding:0.5rem 0.7rem;font-size:13px;color:var(--deep);margin-bottom:0.6rem;}
+.g-fsum[hidden]{display:none;}
+.g-fsum b{font-variant-numeric:tabular-nums;}
+.g-fsum button{border:none;background:none;color:var(--glacier);font:700 12px 'Inter',sans-serif;padding:0.2rem 0;}
+button.g-cat{width:100%;background:none;border:none;text-align:left;font-family:'Inter',sans-serif;color:inherit;border-radius:6px;}
+button.g-cat:active{background:#F9FAFB;}
+.g-cat-go{font-size:12px;color:var(--glacier);}
 .g-filter{display:flex;gap:0.4rem;overflow-x:auto;scrollbar-width:none;margin-bottom:0.6rem;padding-bottom:2px;}
 .g-filter::-webkit-scrollbar{display:none;}
+.g-filter[hidden]{display:none;}
 .g-filter .g-chip{flex-shrink:0;}
 
 /* ── BOTTOM NAV ── */
@@ -1054,7 +1067,13 @@ label.bnav-btn,label.cal-day-btn{cursor:pointer;}
   <div class="card">
     <div class="card-head"><span class="card-tag">LISTA</span><span class="card-title">Todos los gastos</span></div>
     <div class="card-body">
+      <div class="g-view" id="g-view" role="group" aria-label="Agrupar gastos">
+        <span class="g-hint" style="font-weight:700;">Ver gastos</span>
+        <div class="g-seg"><button type="button" data-group="fecha">Por día</button><button type="button" data-group="categoria">Por categoría</button></div>
+      </div>
       <div class="g-filter" id="g-filter" role="group" aria-label="Filtrar por persona"></div>
+      <div class="g-filter" id="g-catfilter" role="group" aria-label="Filtrar por categoría"></div>
+      <div class="g-fsum" id="g-fsum" hidden></div>
       <p class="g-hint" id="g-edit-hint" style="margin:-0.2rem 0 0.4rem;">Toca ✏️ en un gasto para editarlo o borrarlo.</p>
       <div id="g-list"></div>
     </div>
@@ -1432,6 +1451,7 @@ document.addEventListener('change', function (e) {
     { id: 'gasolina',   ic: '⛽', name: 'Gasolina' },
     { id: 'comida',     ic: '🍽️', name: 'Comidas' },
     { id: 'super',      ic: '🛒', name: 'Supermercado' },
+    { id: 'farmacia',   ic: '💊', name: 'Farmacia' },
     { id: 'tours',      ic: '🎟️', name: 'Entradas y tours' },
     { id: 'camping',    ic: '⛺', name: 'Camping y equipo' },
     { id: 'transporte', ic: '🚌', name: 'Transporte' },
@@ -1459,7 +1479,9 @@ document.addEventListener('change', function (e) {
     rates: cached.rates || { USD: 1, CLP: 976.64, CRC: 452.95 }
   };
   var queue = ls(function (s) { return JSON.parse(s.getItem(K_QUEUE) || '[]'); }) || [];
-  var filter = 'todos', editingId = null, flushing = false;
+  var filter = 'todos', catFilter = 'todas', editingId = null, flushing = false;
+  var K_GROUP = 'patagonia-gastos-vista';
+  var groupBy = ls(function (s) { return s.getItem(K_GROUP); }) === 'categoria' ? 'categoria' : 'fecha';
 
   // ── Formatos ──
   var nf0 = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 });
@@ -1578,30 +1600,57 @@ document.addEventListener('change', function (e) {
     var max = cats.length ? c.byCat[cats[0].id] : 1;
     $('g-cats-sum').innerHTML = cats.length ? cats.map(function (k) {
       var v = c.byCat[k.id], pct = c.total ? Math.round(v / c.total * 100) : 0;
-      return '<div class="g-cat"><span class="g-cat-ic" aria-hidden="true">' + k.ic + '</span><span class="g-cat-name">' + k.name + ' <span class="g-hint">' + pct + '%</span></span>' +
-        '<span class="g-cat-val">' + money(v, base) + '</span><div class="g-bar"><i style="width:' + Math.max(3, v / max * 100) + '%"></i></div></div>';
-    }).join('') : '<div class="g-empty">Aún no hay gastos.</div>';
+      return '<button type="button" class="g-cat" data-catgo="' + k.id + '" aria-label="Ver gastos de ' + k.name + '"><span class="g-cat-ic" aria-hidden="true">' + k.ic + '</span><span class="g-cat-name">' + k.name + ' <span class="g-hint">' + pct + '%</span></span>' +
+        '<span class="g-cat-val">' + money(v, base) + ' <span class="g-cat-go" aria-hidden="true">›</span></span><div class="g-bar"><i style="width:' + Math.max(3, v / max * 100) + '%"></i></div></button>';
+    }).join('') + '<p class="g-hint" style="margin-top:0.4rem;">Toca una categoría para ver sus gastos.</p>' : '<div class="g-empty">Aún no hay gastos.</div>';
 
     // Filtro y lista
     $('g-filter').innerHTML = ['todos'].concat(PEOPLE).map(function (p) {
       return '<button type="button" class="g-chip" data-filter="' + p + '" aria-pressed="' + (filter === p) + '">' + (p === 'todos' ? 'Todos' : p) + '</button>';
     }).join('');
+    var used = CATS.filter(function (k) { return state.gastos.some(function (g) { return g.categoria === k.id; }); });
+    if (catFilter !== 'todas' && !used.some(function (k) { return k.id === catFilter; })) catFilter = 'todas';
+    $('g-catfilter').innerHTML = [{ id: 'todas', ic: '', name: 'Todas las categorías' }].concat(used).map(function (k) {
+      return '<button type="button" class="g-chip" data-catfilter="' + k.id + '" aria-pressed="' + (catFilter === k.id) + '">' + (k.ic ? '<span aria-hidden="true">' + k.ic + '</span>' : '') + k.name + '</button>';
+    }).join('');
+    $('g-catfilter').hidden = used.length < 2;
+    document.querySelectorAll('#g-view [data-group]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.group === groupBy); });
+
     var list = state.gastos.filter(function (g) {
-      return filter === 'todos' || g.pagado_por === filter || (g.participantes || []).indexOf(filter) > -1;
+      return (filter === 'todos' || g.pagado_por === filter || (g.participantes || []).indexOf(filter) > -1) &&
+             (catFilter === 'todas' || g.categoria === catFilter);
     }).sort(function (a, b) { return a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : (a.created_at < b.created_at ? 1 : -1); });
+    var keyOf = function (g) { return groupBy === 'categoria' ? g.categoria : g.fecha; };
+    if (groupBy === 'categoria') {
+      var order = {}; CATS.forEach(function (k, i) { order[k.id] = i; });
+      var catSum = {}; list.forEach(function (g) { catSum[g.categoria] = (catSum[g.categoria] || 0) + cents(toBase(+g.monto, g.moneda)); });
+      list.sort(function (a, b) { return (catSum[b.categoria] - catSum[a.categoria]) || (order[a.categoria] - order[b.categoria]) || (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0); });
+    }
+    var filtered = filter !== 'todos' || catFilter !== 'todas';
+    var listTotal = list.reduce(function (t, g) { return t + cents(toBase(+g.monto, g.moneda)); }, 0) / 100;
+    $('g-fsum').hidden = !filtered || !list.length;
+    if (filtered) $('g-fsum').innerHTML = '<span>' + list.length + (list.length === 1 ? ' gasto' : ' gastos') + ' · <b>' + money(listTotal, base) + '</b></span><button type="button" id="g-fclear">Quitar filtros</button>';
     $('g-edit-hint').hidden = !list.length;
-    if (!list.length) { $('g-list').innerHTML = '<div class="g-empty">' + (state.gastos.length ? 'Sin gastos para ' + esc(filter) + '.' : 'Toca <b>Agregar gasto</b> para registrar el primero.') + '</div>'; return; }
+    if (!list.length) {
+      var what = [filter !== 'todos' ? esc(filter) : '', catFilter !== 'todas' ? (CAT[catFilter] || {}).name : ''].filter(Boolean).join(' en ');
+      $('g-list').innerHTML = '<div class="g-empty">' + (state.gastos.length ? 'Sin gastos para ' + what + '.' : 'Toca <b>Agregar gasto</b> para registrar el primero.') + '</div>';
+      return;
+    }
     var html = '', day = null, dayTotal = {};
-    list.forEach(function (g) { dayTotal[g.fecha] = (dayTotal[g.fecha] || 0) + cents(toBase(+g.monto, g.moneda)); });
+    list.forEach(function (g) { dayTotal[keyOf(g)] = (dayTotal[keyOf(g)] || 0) + cents(toBase(+g.monto, g.moneda)); });
     Object.keys(dayTotal).forEach(function (d) { dayTotal[d] /= 100; });
     list.forEach(function (g) {
-      if (g.fecha !== day) { day = g.fecha; html += '<div class="g-day"><span>' + fmtDay(day) + '</span><span>' + money(dayTotal[day], base) + '</span></div>'; }
+      if (keyOf(g) !== day) {
+        day = keyOf(g);
+        var head = groupBy === 'categoria' ? ((CAT[day] || CAT.otros).ic + ' ' + (CAT[day] || CAT.otros).name) : fmtDay(day);
+        html += '<div class="g-day"><span>' + head + '</span><span>' + money(dayTotal[day], base) + '</span></div>';
+      }
       var k = CAT[g.categoria] || CAT.otros, parts = g.participantes || [];
       var who = parts.length === PEOPLE.length ? 'entre todos' : 'entre ' + parts.join(', ');
       var eq = g.moneda !== base ? '<small>≈ ' + money(cents(toBase(+g.monto, g.moneda)) / 100, base) + '</small>' : '';
       var pend = isPending(g.id) ? ' <span class="g-pend" title="Sin subir">⏳</span>' : '';
       html += '<button type="button" class="g-item" data-id="' + g.id + '" aria-label="Editar ' + esc(g.descripcion || k.name) + ', ' + esc(money(+g.monto, g.moneda)) + '"><span class="g-item-ic" aria-hidden="true">' + k.ic + '</span>' +
-        '<span><span class="g-item-t">' + esc(g.descripcion || k.name) + pend + '</span><span class="g-item-s" style="display:block;">Pagó ' + esc(g.pagado_por) + ' · ' + esc(who) + '</span></span>' +
+        '<span><span class="g-item-t">' + esc(g.descripcion || k.name) + pend + '</span><span class="g-item-s" style="display:block;">' + (groupBy === 'categoria' ? fmtDay(g.fecha) + ' · ' : '') + 'Pagó ' + esc(g.pagado_por) + ' · ' + esc(who) + '</span></span>' +
         '<span class="g-item-a">' + money(+g.monto, g.moneda) + eq + '</span>' +
         '<span class="g-item-edit" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span></button>';
     });
@@ -1704,6 +1753,17 @@ document.addEventListener('change', function (e) {
     base = b.dataset.base; baseFixed = true;
     ls(function (s) { s.setItem(K_BASE, base); });
     render();
+  });
+  $('g-view').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-group]'); if (!b) return;
+    groupBy = b.dataset.group; ls(function (s) { s.setItem(K_GROUP, groupBy); }); render();
+  });
+  $('g-catfilter').addEventListener('click', function (e) { var b = e.target.closest('[data-catfilter]'); if (b) { catFilter = b.dataset.catfilter; render(); } });
+  $('g-fsum').addEventListener('click', function (e) { if (e.target.id === 'g-fclear') { filter = 'todos'; catFilter = 'todas'; render(); } });
+  $('g-cats-sum').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-catgo]'); if (!b) return;
+    catFilter = b.dataset.catgo; filter = 'todos'; render();
+    $('g-list').closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   $('g-filter').addEventListener('click', function (e) { var b = e.target.closest('[data-filter]'); if (b) { filter = b.dataset.filter; render(); } });
 
